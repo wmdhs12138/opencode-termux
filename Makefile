@@ -1,4 +1,4 @@
-SHELL := /data/data/com.termux/files/usr/bin/bash
+SHELL := bash
 VERSION ?= latest
 INPUT_ELF ?= $(CURDIR)/work/upstream/opencode
 BUN ?= $(CURDIR)/work/bun-android/bun
