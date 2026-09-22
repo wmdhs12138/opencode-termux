@@ -5,7 +5,9 @@ ROOT="$1"
 SOURCE="$2"
 TARGET_DIR="$3"
 TLS_OBJECT="$4"
-LINKER="${PREFIX:-/data/data/com.termux/files/usr}/bin/aarch64-linux-android-clang"
+TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+LINKER="$TERMUX_PREFIX/bin/aarch64-linux-android-clang"
+[ -x "$LINKER" ] || LINKER="$TERMUX_PREFIX/bin/clang"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 command -v cargo >/dev/null || { echo "build-rust-pty: cargo is missing in the build container" >&2; exit 1; }
