@@ -10,7 +10,7 @@ glibc、proot 或兼容层。
 ## 当前基线
 
 首个完整验证基线是官方 OpenCode **v1.18.32**。输入来自官方 GitHub Release 的
-`opencode-linux-arm64.tar.gz`，不是 Hope2333 的重打包产物，也不是 v2 版本线。CI 会
+`opencode-linux-arm64.tar.gz`。CI 会
 跟踪官方 Latest；上游原生 ABI 变化时构建会安全失败，待版本锁和补丁更新后再发布。
 
 已完成一次严格构建：
