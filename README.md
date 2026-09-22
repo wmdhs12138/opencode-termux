@@ -73,6 +73,7 @@ OpenCode 自带的升级命令也已适配 Termux：
 
 ```bash
 opencode upgrade
+# 或者：opencode update
 ```
 
 它只会查询并安装本项目已经通过 Bionic CI 验证的 Release，不会下载官方 glibc 包。

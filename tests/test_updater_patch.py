@@ -7,12 +7,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from graph_format import GraphError
 from patch_updater_graph import (
+    COMMAND_AFTER,
+    COMMAND_BEFORE,
     METHOD_AFTER,
     METHOD_BEFORE,
     TERMUX_INSTALLER,
     TERMUX_RELEASES,
     UPSTREAM_INSTALLER,
     UPSTREAM_RELEASES,
+    patch_command,
     patch_updater,
 )
 
@@ -30,6 +33,10 @@ class UpdaterPatchTests(unittest.TestCase):
     def test_rejects_unknown_upstream_layout(self):
         with self.assertRaises(GraphError):
             patch_updater(b"upstream changed")
+
+    def test_update_is_an_alias_for_upgrade(self):
+        result = patch_command(COMMAND_BEFORE.encode()).decode()
+        self.assertEqual(result, COMMAND_AFTER)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ METHOD_AFTER = (
     '"/data/data/com.termux/files/usr")+"/bin/")||'
     'process.execPath.includes(R.join(".opencode","bin")))return"curl";'
 )
+COMMAND_BEFORE = 'command:"upgrade [target]",describe:'
+COMMAND_AFTER = 'command:["upgrade [target]","update [target]"],describe:'
 
 
 def replace_exact(text: str, old: str, new: str) -> str:
@@ -40,6 +42,11 @@ def patch_updater(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def patch_command(source: bytes) -> bytes:
+    text = source.decode("utf-8")
+    return replace_exact(text, COMMAND_BEFORE, COMMAND_AFTER).encode("utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("input")
@@ -48,20 +55,39 @@ def main() -> None:
     args = parser.parse_args()
 
     graph = Graph.from_path(args.input)
-    matches = [
+    service_matches = [
         module
         for module in graph.modules()
         if UPSTREAM_INSTALLER.encode() in module.contents
         and UPSTREAM_RELEASES.encode() in module.contents
     ]
-    if len(matches) != 1:
-        raise GraphError(f"expected one bundled updater module, found {len(matches)}")
+    if len(service_matches) != 1:
+        raise GraphError(
+            f"expected one bundled updater module, found {len(service_matches)}"
+        )
 
-    target = matches[0]
-    result = graph.replace_contents_by_append(
-        target.index, patch_updater(target.contents)
+    service = service_matches[0]
+    service_result = graph.replace_contents_by_append(
+        service.index, patch_updater(service.contents)
     )
-    result["patch"] = "termux-bionic-updater"
+    command_matches = [
+        module
+        for module in graph.modules()
+        if COMMAND_BEFORE.encode() in module.contents
+    ]
+    if len(command_matches) != 1:
+        raise GraphError(
+            f"expected one bundled upgrade command, found {len(command_matches)}"
+        )
+    command = command_matches[0]
+    command_result = graph.replace_contents_by_append(
+        command.index, patch_command(command.contents)
+    )
+    result = {
+        "patch": "termux-bionic-updater",
+        "modules": [service_result, command_result],
+        "update_alias": True,
+    }
     graph.write(args.output)
 
     encoded = json.dumps(result, indent=2) + "\n"
