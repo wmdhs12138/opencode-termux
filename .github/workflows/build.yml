@@ -132,9 +132,8 @@ jobs:
   release:
     needs: [resolve, bionic]
     if: >-
-      needs.resolve.outputs.unreleased == 'true' &&
-      (github.event_name == 'schedule' ||
-       (github.event_name == 'workflow_dispatch' && inputs.publish))
+      (github.event_name == 'schedule' && needs.resolve.outputs.unreleased == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -162,10 +161,18 @@ jobs:
 
               curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh | bash
           EOF
-          gh release create "v$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "OpenCode $VERSION · Termux" \
-            --notes-file release-notes.md \
-            "artifact/$PACKAGE.zip" \
-            "artifact/$PACKAGE.zip.sha256" \
+          assets=(
+            "artifact/$PACKAGE.zip"
+            "artifact/$PACKAGE.zip.sha256"
             "artifact/build-manifest.json"
+          )
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" --repo "$GITHUB_REPOSITORY" \
+              --clobber "${assets[@]}"
+            gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" \
+              --title "OpenCode $VERSION · Termux" --notes-file release-notes.md
+          else
+            gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" \
+              --title "OpenCode $VERSION · Termux" \
+              --notes-file release-notes.md "${assets[@]}"
+          fi

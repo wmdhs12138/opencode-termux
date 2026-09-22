@@ -41,9 +41,11 @@ stage="$(mktemp -d "${TMPDIR:-$PREFIX_PATH/tmp}/opencode-termux.XXXXXX")"
 trap 'rm -rf "$stage"' EXIT
 
 printf 'Downloading OpenCode %s for Termux...\n' "$version"
-curl -fL --retry 3 --progress-bar -o "$stage/$package.zip" \
+curl -fL --retry 5 --retry-all-errors --retry-delay 2 -C - \
+  --progress-bar -o "$stage/$package.zip" \
   "$download/$package.zip"
-curl -fsSL --retry 3 -o "$stage/$package.zip.sha256" \
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 \
+  -o "$stage/$package.zip.sha256" \
   "$download/$package.zip.sha256"
 
 (
@@ -52,6 +54,7 @@ curl -fsSL --retry 3 -o "$stage/$package.zip.sha256" \
   unzip -q "$package.zip"
 )
 
-install -m 755 "$stage/$package/opencode" "$PREFIX_PATH/bin/opencode"
+install -m 755 "$stage/$package/opencode" "$PREFIX_PATH/bin/.opencode.new"
+mv -f "$PREFIX_PATH/bin/.opencode.new" "$PREFIX_PATH/bin/opencode"
 printf 'Installed: %s\n' "$PREFIX_PATH/bin/opencode"
 "$PREFIX_PATH/bin/opencode" --version

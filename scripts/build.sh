@@ -28,7 +28,10 @@ GRAPH="$WORK/opencode.graph"
 python3 "$ROOT/tools/extract_graph.py" "$INPUT_ELF" "$GRAPH" > "$WORK/extract.json"
 python3 "$ROOT/tools/audit_native_assets.py" "$GRAPH" --report "$WORK/native-before.json" >/dev/null
 
-CURRENT="$GRAPH"
+UPDATER_PATCHED="$WORK/opencode.termux-updater.graph"
+python3 "$ROOT/tools/patch_updater_graph.py" "$GRAPH" "$UPDATER_PATCHED" \
+  --report "$WORK/patch-termux-updater.json" >/dev/null
+CURRENT="$UPDATER_PATCHED"
 if [ -n "${FFF_SO:-}" ]; then
   FFF_PATCHED="$WORK/opencode.fff-pointers.graph"
   python3 "$ROOT/tools/patch_fff_graph.py" "$CURRENT" "$FFF_PATCHED" \

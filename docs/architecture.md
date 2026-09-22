@@ -19,6 +19,10 @@ trailer、Offsets、52 字节模块记录和 graph-relative StringPointer 与 Bu
 - 模块表和可选记录不需要重排；
 - 原资产保留为不可达数据，便于差异审计。
 
+`patch_updater_graph.py` 会对上游 updater 模块做版本严格的三处改写：Termux 安装路径
+识别、最新版查询地址和安装脚本地址。任何上游代码布局变化都会让构建失败，而不是退回
+官方 glibc 更新通道。
+
 ## 发布门禁
 
 正式产物必须同时满足：
@@ -31,6 +35,6 @@ trailer、Offsets、52 字节模块记录和 graph-relative StringPointer 与 Bu
 6. TUI 在隔离 HOME 中渲染真实帧；
 7. service、PTY 和 watcher 功能 smoke 通过。
 
-`make build-strict` 会先从固定源码构建四个替换资产，再修补 FFF wrapper、做 graph
-替换、严格 ELF 审计、graft 验证、版本验证和 TUI smoke。只有完整链路成功才会原子替换
-`dist/opencode`。
+`make build-strict` 会先从固定源码构建四个替换资产，再修补 updater 与 FFF wrapper、做
+graph 替换、严格 ELF 审计、graft 验证、版本验证和 TUI smoke。只有完整链路成功才会
+原子替换 `dist/opencode`。
