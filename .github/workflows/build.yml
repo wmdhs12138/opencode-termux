@@ -160,8 +160,7 @@ jobs:
 
           Install:
 
-              unzip $PACKAGE.zip
-              install -m 755 $PACKAGE/opencode \$PREFIX/bin/opencode
+              curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh | bash
           EOF
           gh release create "v$VERSION" \
             --repo "$GITHUB_REPOSITORY" \

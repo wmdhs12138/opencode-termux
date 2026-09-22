@@ -58,17 +58,25 @@ official opencode-linux-arm64
        dist/opencode
 ```
 
-## 安装 Release
+## 安装 / 更新
 
-在 GitHub Release 下载 `opencode-termux-v*-android-aarch64.zip`，然后：
+在 Termux 中运行一条命令：
 
 ```bash
-unzip opencode-termux-v*-android-aarch64.zip
-install -m 755 opencode-termux-v*-android-aarch64/opencode "$PREFIX/bin/opencode"
-opencode --version
+curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | bash
 ```
 
-只支持 AArch64 和 Android API 28+。
+重复运行就是更新。安装器会自动获取最新版、验证 SHA-256，并安装到
+`$PREFIX/bin/opencode`。只支持 AArch64 和 Android API 28+。
+
+安装指定版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | VERSION=1.18.32 bash
+```
+
+也可以继续从 [GitHub Releases](https://github.com/wmdhs12138/opencode-termux/releases)
+手动下载 zip 安装。
 
 ## 从源码构建
 

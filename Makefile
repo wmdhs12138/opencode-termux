@@ -51,7 +51,7 @@ smoke:
 test:
 	python3 -m unittest discover -s tests -v
 	python3 -m py_compile tools/*.py
-	bash -n scripts/*.sh
+	bash -n install.sh scripts/*.sh
 
 verify:
 	dist/opencode --version
