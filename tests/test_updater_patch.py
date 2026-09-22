@@ -11,6 +11,8 @@ from patch_updater_graph import (
     COMMAND_BEFORE,
     METHOD_AFTER,
     METHOD_BEFORE,
+    REGISTRATION_AFTER,
+    REGISTRATION_BEFORE,
     TERMUX_INSTALLER,
     TERMUX_RELEASES,
     UPSTREAM_INSTALLER,
@@ -34,9 +36,16 @@ class UpdaterPatchTests(unittest.TestCase):
         with self.assertRaises(GraphError):
             patch_updater(b"upstream changed")
 
-    def test_update_is_an_alias_for_upgrade(self):
-        result = patch_command(COMMAND_BEFORE.encode()).decode()
-        self.assertEqual(result, COMMAND_AFTER)
+    def test_update_checks_and_upgrade_installs(self):
+        source = f"{COMMAND_BEFORE}body|{REGISTRATION_BEFORE}"
+        result = patch_command(source.encode()).decode()
+        self.assertIn(COMMAND_AFTER, result)
+        self.assertIn(REGISTRATION_AFTER, result)
+        self.assertIn('command:"update"', result)
+        self.assertIn("Run opencode upgrade to install it", result)
+        self.assertIn("Update check failed", result)
+        self.assertIn('typeof D!=="string"', result)
+        self.assertIn('command:"upgrade [target]"', result)
 
 
 if __name__ == "__main__":

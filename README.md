@@ -69,11 +69,11 @@ curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/ins
 重复运行就是更新。安装器会自动获取最新版、验证 SHA-256，并安装到
 `$PREFIX/bin/opencode`。只支持 AArch64 和 Android API 28+。
 
-OpenCode 自带的升级命令也已适配 Termux：
+OpenCode 自带的更新命令也已适配 Termux：
 
 ```bash
-opencode upgrade
-# 或者：opencode update
+opencode update   # 只检查是否有新版
+opencode upgrade  # 下载并安装新版
 ```
 
 它只会查询并安装本项目已经通过 Bionic CI 验证的 Release，不会下载官方 glibc 包。

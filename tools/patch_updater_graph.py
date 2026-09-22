@@ -14,15 +14,30 @@ TERMUX_INSTALLER = (
     "https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh"
 )
 UPSTREAM_RELEASES = "https://api.github.com/repos/anomalyco/opencode/releases/latest"
-TERMUX_RELEASES = "https://api.github.com/repos/wmdhs12138/opencode-termux/releases/latest"
+TERMUX_RELEASES = (
+    "https://github.com/wmdhs12138/opencode-termux/releases/latest/download/"
+    "build-manifest.json"
+)
 METHOD_BEFORE = 'if(process.execPath.includes(R.join(".opencode","bin")))return"curl";'
 METHOD_AFTER = (
     'if(process.execPath.startsWith((process.env.PREFIX??'
     '"/data/data/com.termux/files/usr")+"/bin/")||'
     'process.execPath.includes(R.join(".opencode","bin")))return"curl";'
 )
-COMMAND_BEFORE = 'command:"upgrade [target]",describe:'
-COMMAND_AFTER = 'command:["upgrade [target]","update [target]"],describe:'
+COMMAND_BEFORE = 'var v8={command:"upgrade [target]",describe:'
+COMMAND_AFTER = (
+    'var TermuxUpdateCommand={command:"update",describe:"check for opencode updates",'
+    'handler:async()=>{M.empty(),M.println(M.logo("  ")),M.empty(),_D("Update");'
+    'let D=await Lu.latest().catch(D=>D);if(typeof D!=="string"){T.error(`Update check '
+    'failed: ${D instanceof Error?D.message:String(D)}`),g("Done");return}T.info(`Current: ${gD}`),T.info(`Latest: ${D}`),'
+    'gD===D?T.info("OpenCode is up to date"):T.warn(`Update available: ${D}. '
+    'Run opencode upgrade to install it.`),g("Done")}};'
+    'var v8={command:"upgrade [target]",describe:'
+)
+REGISTRATION_BEFORE = '.command(t8).command(v8).command(l8)'
+REGISTRATION_AFTER = (
+    '.command(t8).command(TermuxUpdateCommand).command(v8).command(l8)'
+)
 
 
 def replace_exact(text: str, old: str, new: str) -> str:
@@ -44,7 +59,9 @@ def patch_updater(source: bytes) -> bytes:
 
 def patch_command(source: bytes) -> bytes:
     text = source.decode("utf-8")
-    return replace_exact(text, COMMAND_BEFORE, COMMAND_AFTER).encode("utf-8")
+    text = replace_exact(text, COMMAND_BEFORE, COMMAND_AFTER)
+    text = replace_exact(text, REGISTRATION_BEFORE, REGISTRATION_AFTER)
+    return text.encode("utf-8")
 
 
 def main() -> None:
@@ -86,7 +103,7 @@ def main() -> None:
     result = {
         "patch": "termux-bionic-updater",
         "modules": [service_result, command_result],
-        "update_alias": True,
+        "update_check_command": True,
     }
     graph.write(args.output)
 

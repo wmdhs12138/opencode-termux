@@ -88,6 +88,7 @@ def load(path):
         return json.load(f)
 doc = {
     "opencode": version,
+    "tag_name": "v" + version,
     "input_sha256": input_sha,
     "output_sha256": output_sha,
     "graph_sha256": graph_sha,
