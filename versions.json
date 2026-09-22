@@ -1,0 +1,47 @@
+{
+  "base_bun": {
+    "version": "1.4.3-canary.1+5fce36ebb",
+    "url": "https://github.com/wmdhs12138/bun/releases/download/bionic-v1.4.3-canary.1-5fce36ebb/bun-linux-aarch64-android-5fce36ebb6.zip",
+    "archive_sha256": "ff731aeadd66f3d35b6331c08c29685284e9b08f508f5d1d44305290939a8db0",
+    "binary_sha256": "7e8b9686dcb86aea55ba06dd4aa46800189933d3ffe9d22f4209003f82f9ff74"
+  },
+  "android_ndk": {
+    "version": "27.2.12479018",
+    "api": 28
+  },
+  "rust": {
+    "version": "1.90.0"
+  },
+  "watcher": {
+    "version": "2.5.1",
+    "source_url": "https://registry.npmjs.org/@parcel/watcher/-/watcher-2.5.1.tgz",
+    "source_sha256": "bf7a6b5577a287153c9a6bf7be953556b998f2a57706eb7a5371ec7eb0088d41",
+    "node_addon_api_version": "7.1.1",
+    "node_addon_api_url": "https://registry.npmjs.org/node-addon-api/-/node-addon-api-7.1.1.tgz",
+    "node_addon_api_sha256": "b10455d15a977c0cd17a1cb0eb679e03d939f8ef8d4302eb33e1f78dacc71f82"
+  },
+  "opentui": {
+    "version": "0.4.5",
+    "source_url": "https://codeload.github.com/anomalyco/opentui/tar.gz/refs/tags/v0.4.5",
+    "source_sha256": "a87acc1af6d5f62ee48905176965514b06c7b6e8f9c1fe869604e5933825ca50"
+  },
+  "fff": {
+    "version": "0.9.4",
+    "source_url": "https://codeload.github.com/dmtrKovalenko/fff/tar.gz/refs/tags/v0.9.4",
+    "source_sha256": "6c7d7624a636e9a751f7861abac248c0901d5aec6ef55dbf558294e5756c1c7e"
+  },
+  "rust_pty": {
+    "package": "bun-pty",
+    "version": "0.4.8",
+    "source_url": "https://codeload.github.com/sursaone/bun-pty/tar.gz/refs/tags/v0.4.8",
+    "source_sha256": "a1e09830bc87ea3af0cb024b560a0545b3e17f169d5b9e4801e04fa8a1d316f5",
+    "portable_pty_version": "0.9.0"
+  },
+  "zig": {
+    "version": "0.15.2",
+    "aarch64_linux_url": "https://ziglang.org/download/0.15.2/zig-aarch64-linux-0.15.2.tar.xz",
+    "aarch64_linux_sha256": "958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f",
+    "x86_64_linux_url": "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz",
+    "x86_64_linux_sha256": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239"
+  }
+}

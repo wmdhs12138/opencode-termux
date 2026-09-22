@@ -1,0 +1,40 @@
+diff --git a/packages/core/src/zig/build.zig b/packages/core/src/zig/build.zig
+--- a/packages/core/src/zig/build.zig
++++ b/packages/core/src/zig/build.zig
+@@ -189,7 +189,7 @@ fn addNativeAudioDependencies(
+ 
+     switch (target.result.os.tag) {
+         .macos => addMacOSSystemLibraries(b, artifact, macos_sdk_path.?),
+-        .linux => {
++        .linux => if (target.result.abi != .android) {
+             artifact.linkSystemLibrary("dl");
+             artifact.linkSystemLibrary("pthread");
+         },
+@@ -491,6 +491,27 @@ fn buildTarget(
+         .linkage = .dynamic,
+     });
+ 
++    if (target.result.abi == .android) {
++        const ndk = b.graph.env_map.get("ANDROID_NDK_HOME") orelse return error.AndroidNDKNotFound;
++        const sysroot = b.pathJoin(&.{ ndk, "toolchains", "llvm", "prebuilt", "linux-x86_64", "sysroot", "usr" });
++        const include = b.pathJoin(&.{ sysroot, "include" });
++        const library = b.pathJoin(&.{ sysroot, "lib", "aarch64-linux-android" });
++        const libc_txt = b.fmt(
++            \\include_dir={s}
++            \\sys_include_dir={s}/aarch64-linux-android
++            \\crt_dir={s}/24
++            \\msvc_lib_dir=
++            \\kernel32_lib_dir=
++            \\gcc_dir=
++        , .{ include, include, library });
++        const files = b.addWriteFiles();
++        lib.setLibCFile(files.add("libc.txt", libc_txt));
++        lib.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ include, "c++", "v1" }) });
++        lib.addLibraryPath(.{ .cwd_relative = library });
++        const tls_align = b.graph.env_map.get("OPENCODE_TERMUX_TLS_ALIGN") orelse return error.MissingTLSAlignmentAnchor;
++        lib.addAssemblyFile(.{ .cwd_relative = tls_align });
++    }
++
+     addNativeAudioDependencies(b, lib, target, macos_sdk_path);
+     addYogaDependencies(b, lib);
+ 
