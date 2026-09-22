@@ -59,7 +59,7 @@ GitHub Actions 在 ARM64 runner 的官方 Termux Docker 环境中完成 Bionic �
 
 - PR：运行工具与 graph 回归测试；
 - 推送至 `main`：构建并上传 Action artifact；
-- 每 6 小时：检查官方最新版，通过全部测试后自动发布；
+- 每天：检查官方最新版，通过全部测试后自动发布；
 - 手动运行：构建或发布指定版本。
 
 发布前会验证源码哈希、graph 结构、原生 ELF 依赖、版本输出及真实 TUI 启动。详见 [CI 文档](docs/ci.md) 和 [原生组件说明](docs/native-assets.md)。
