@@ -9,10 +9,8 @@ OUTPUT="$5"
 TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-CC="$TERMUX_PREFIX/bin/aarch64-linux-android-clang"
-CXX="$TERMUX_PREFIX/bin/aarch64-linux-android-clang++"
-[ -x "$CC" ] || CC="$TERMUX_PREFIX/bin/clang"
-[ -x "$CXX" ] || CXX="$TERMUX_PREFIX/bin/clang++"
+CC="$ROOT/scripts/android-clang"
+CXX="$ROOT/scripts/android-clang++"
 
 command -v cargo >/dev/null || { echo "build-fff: cargo is missing in the build container" >&2; exit 1; }
 rustup target list --installed --toolchain 1.90.0 | grep -Fx aarch64-linux-android >/dev/null || {

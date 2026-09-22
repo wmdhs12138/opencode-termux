@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+exec "$TERMUX_PREFIX/bin/clang++" --target=aarch64-linux-android24 "$@"
