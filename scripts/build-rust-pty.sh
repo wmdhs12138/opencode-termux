@@ -32,7 +32,8 @@ tar -xzf "$ARCHIVE" -C "$STAGE/source" --strip-components=1
 patch -d "$STAGE/source" -p1 < "$ROOT/patches/bun-pty-android.patch"
 clang -c -fPIC "$ROOT/native/tls-align.S" -o "$STAGE/tls-align.o"
 
-proot-distro login "$DISTRO" -- bash "$ROOT/scripts/build-rust-pty-inner.sh" \
+proot-distro login --bind /system:/system "$DISTRO" -- \
+  bash "$ROOT/scripts/build-rust-pty-inner.sh" \
   "$ROOT" "$STAGE/source" "$STAGE/target" "$STAGE/tls-align.o"
 
 python3 "$ROOT/tools/elf_native.py" "$ROOT/work/native/rust-pty.new.so" >/dev/null

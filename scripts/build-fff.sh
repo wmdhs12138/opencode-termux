@@ -31,7 +31,8 @@ mkdir -p "$STAGE/source" "$STAGE/target"
 tar -xzf "$ARCHIVE" -C "$STAGE/source" --strip-components=1
 clang -c -fPIC "$ROOT/native/tls-align.S" -o "$STAGE/tls-align.o"
 
-proot-distro login "$DISTRO" -- bash "$ROOT/scripts/build-fff-inner.sh" \
+proot-distro login --bind /system:/system "$DISTRO" -- \
+  bash "$ROOT/scripts/build-fff-inner.sh" \
   "$ROOT" "$STAGE/source" "$STAGE/target" "$STAGE/tls-align.o" \
   "$OUT_DIR/.libfff_c.new.so"
 
