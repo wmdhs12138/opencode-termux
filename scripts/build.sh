@@ -72,6 +72,12 @@ python3 "$ROOT/tools/verify_graft.py" "$CANDIDATE" "$(stat -c%s "$CURRENT")" \
 TUI_SMOKE="skipped-cross-build"
 if [ "$SKIP_RUN" != 1 ]; then
   "$CANDIDATE" --version | grep -F "$VERSION" >/dev/null
+  # The injected update command reuses minified upstream identifiers; a stale
+  # one only surfaces at runtime. Network failures are handled and exit 0.
+  timeout 120 "$CANDIDATE" update </dev/null > "$WORK/update-smoke.log" 2>&1 || {
+    echo "build: update command smoke failed; inspect $WORK/update-smoke.log" >&2
+    exit 1
+  }
   python3 "$ROOT/tools/tui_smoke.py" "$CANDIDATE" "$SMOKE_SECONDS" > "$WORK/tui-smoke.log"
   TUI_SMOKE="pass"
 fi
