@@ -15,5 +15,7 @@ their respective upstream licenses. Source versions and immutable archive
 hashes used directly by this project are recorded in `versions.json` and the
 release `BUILD-MANIFEST.json`.
 
-`tools/revive_patch.py` is vendored unmodified from
-[Hope2333/opencode-termux](https://github.com/Hope2333/opencode-termux), MIT.
+`tools/revive_patch.py` is vendored from
+[Hope2333/opencode-termux](https://github.com/Hope2333/opencode-termux), MIT,
+with one local fix that keeps the base's non-loaded tail out of `.bss`
+(see the file header; sent upstream as Hope2333/opencode-termux#34).
