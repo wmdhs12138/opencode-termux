@@ -4,6 +4,18 @@
 Upstream ships minified JS, so identifiers such as the upgrade command
 variable or the UI/log helpers are renamed on every release. They are read
 from the bundled upgrade command itself instead of being hard-coded.
+
+A release is either vX.Y.Z or a re-cut vX.Y.Z-rN of the same OpenCode version
+(new toolchain, same upstream code). The version alone cannot tell them apart,
+so the explicit commands compare the running binary's SHA-256 with the latest
+release's build-manifest.json:
+
+  opencode update   reports a newer version, or a rebuilt one of this version
+  opencode upgrade  no longer skips the installed version when the latest
+                    release of it is a different build
+
+`Installation.latest()`, and with it the TUI's automatic update check, keeps
+comparing versions, so a re-cut never triggers a background reinstall.
 """
 
 from __future__ import annotations
@@ -45,21 +57,37 @@ COMMAND_PATTERN = re.compile(
     rf'let {ID}=await (?P<installation>{ID})\.method\(\)'
     rf'.*?(?P<log>{ID})\.info\("Using method: "'
     rf'.*?await (?P=installation)\.latest\(\);'
-    rf'if\((?P<version>{ID})==={ID}\)\{{(?P=log)\.warn\(`opencode upgrade skipped: '
+    rf'if\((?P<version>{ID})===(?P<target>{ID})\)\{{(?P=log)\.warn\(`opencode upgrade skipped: '
     rf'.*?(?P<outro>{ID})\("Done"\);return\}}',
     re.DOTALL,
 )
+# Injected in front of the upgrade command, so every name it uses is in scope.
+# TermuxBuildCheck hashes process.execPath with Bun's native SHA-256 (about a
+# second for the ~200 MB binary) and reads the latest release's manifest.
 UPDATE_COMMAND = (
-    'var TermuxUpdateCommand={{command:"update",describe:"check for opencode updates",'
+    'var TermuxBuildCheck=async()=>{{let termuxResponse=await fetch("{releases}");'
+    'if(!termuxResponse.ok)throw Error(`HTTP ${{termuxResponse.status}} from the release manifest`);'
+    'let termuxManifest=await termuxResponse.json(),termuxHash=new Bun.CryptoHasher("sha256");'
+    'for await(let termuxChunk of Bun.file(process.execPath).stream())termuxHash.update(termuxChunk);'
+    'return{{version:String(termuxManifest.tag_name??"").replace(/^v/,""),'
+    'build:String(termuxManifest.output_sha256??""),current:termuxHash.digest("hex")}}}},'
+    'TermuxSameBuild=async(termuxVersion)=>{{try{{let termuxBuild=await TermuxBuildCheck();'
+    'return termuxBuild.version!==termuxVersion||!termuxBuild.build||'
+    'termuxBuild.build===termuxBuild.current}}catch{{return true}}}},'
+    'TermuxUpdateCommand={{command:"update",describe:"check for opencode updates",'
     'handler:async()=>{{{ui}.empty(),{ui}.println({ui}.logo("  ")),{ui}.empty(),'
-    '{intro}("Update");let termuxLatest=await {installation}.latest()'
-    '.catch(termuxError=>termuxError);if(typeof termuxLatest!=="string"){{'
-    '{log}.error(`Update check failed: ${{termuxLatest instanceof Error?'
-    'termuxLatest.message:String(termuxLatest)}}`),{outro}("Done");return}}'
-    '{log}.info(`Current: ${{{version}}}`),{log}.info(`Latest: ${{termuxLatest}}`),'
-    '{version}===termuxLatest?{log}.info("OpenCode is up to date"):'
-    '{log}.warn(`Update available: ${{termuxLatest}}. '
-    'Run opencode upgrade to install it.`),{outro}("Done")}}}};'
+    '{intro}("Update");let termuxBuild=await TermuxBuildCheck().catch(termuxError=>'
+    'termuxError instanceof Error?termuxError:Error(String(termuxError)));'
+    'if(termuxBuild instanceof Error){{{log}.error(`Update check failed: ${{termuxBuild.message}}`),'
+    '{outro}("Done");return}}'
+    '{log}.info(`Current: ${{{version}}} (build ${{termuxBuild.current.slice(0,12)}})`),'
+    '{log}.info(`Latest: ${{termuxBuild.version}} (build ${{termuxBuild.build.slice(0,12)}})`),'
+    '{version}!==termuxBuild.version?{log}.warn(`Update available: ${{termuxBuild.version}}. '
+    'Run opencode upgrade to install it.`):'
+    'termuxBuild.build&&termuxBuild.build!==termuxBuild.current?'
+    '{log}.warn(`A rebuilt OpenCode ${{termuxBuild.version}} is available. '
+    'Run opencode upgrade to install it.`):'
+    '{log}.info("OpenCode is up to date"),{outro}("Done")}}}};'
 )
 
 
@@ -100,8 +128,21 @@ def patch_command(source: bytes) -> bytes:
     names = command.groupdict()
     text = (
         text[: command.start()]
-        + UPDATE_COMMAND.format(**names)
+        + UPDATE_COMMAND.format(releases=TERMUX_RELEASES, **names)
         + text[command.start() :]
+    )
+    skip = (
+        f"if({names['version']}==={names['target']}){{"
+        f"{names['log']}.warn(`opencode upgrade skipped: "
+    )
+    text = replace_exact(
+        text,
+        skip,
+        skip.replace(
+            "){",
+            f"&&await TermuxSameBuild({names['target']})){{",
+            1,
+        ),
     )
     text = replace_exact(
         text,
@@ -151,6 +192,7 @@ def main() -> None:
         "patch": "termux-bionic-updater",
         "modules": [service_result, command_result],
         "update_check_command": True,
+        "upgrade_compares_builds": True,
     }
     graph.write(args.output)
 
