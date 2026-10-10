@@ -15,13 +15,15 @@
 curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | bash
 ```
 
-安装器会下载最新 Release、校验 SHA-256，并安装到 `$PREFIX/bin/opencode`。
+安装器会下载最新 Release、校验 SHA-256，并安装到 `$PREFIX/bin/opencode`；已装的就是这个构建时不重复下载。
 
 安装指定版本：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | VERSION=1.18.32 bash
 ```
+
+`VERSION=X.Y.Z` 安装该版本最新的一次构建，`VERSION=X.Y.Z-rN` 安装指定的那一次。
 
 也可以从 [GitHub Releases](https://github.com/wmdhs12138/opencode-termux/releases) 手动下载。
 
@@ -33,6 +35,9 @@ opencode upgrade  # 下载并安装新版本
 ```
 
 两个命令均使用本项目经过 Bionic CI 验证的 Release，不会下载官方 glibc 版本。重复运行安装命令也可以完成更新。
+
+同一 OpenCode 版本因构建工具链更新（例如 Bun 底座）重新发布时，tag 是 `vX.Y.Z-rN`。`update` 和 `upgrade` 按二进制哈希判断，
+能识别这种重新发布；v1.18.35 及更早版本自带的 `upgrade` 只比较版本号，需要重新运行一次安装命令。
 
 ## 实现
 
@@ -51,18 +56,18 @@ official opencode-linux-arm64
           dist/opencode
 ```
 
-补丁使用精确、版本受控的匹配；上游结构或原生 ABI 变化时，构建会直接失败而不是产出未经验证的文件。当前验证基线为 OpenCode v1.18.32。
+补丁使用精确、版本受控的匹配；上游结构或原生 ABI 变化时，构建会直接失败而不是产出未经验证的文件。当前验证基线为 OpenCode v1.18.35。
 
 ## CI
 
 GitHub Actions 在 ARM64 runner 的官方 Termux Docker 环境中完成 Bionic 构建：
 
-- PR：运行工具与 graph 回归测试；
-- 推送至 `main`：构建并上传 Action artifact；
+- PR：运行工具、安装器、发布流程与 graph 回归测试；
+- 推送至 `main`：完整构建与验收；最新版还没有 Release 时自动发布；
 - 每天：检查官方最新版，通过全部测试后自动发布；
-- 手动运行：构建或发布指定版本。
+- 手动运行：构建指定版本；勾选 `recut` 在工具链变化后重新发布同一版本（`vX.Y.Z-rN`）。
 
-发布前会验证源码哈希、graph 结构、原生 ELF 依赖、版本输出及真实 TUI 启动。详见 [CI 文档](docs/ci.md) 和 [原生组件说明](docs/native-assets.md)。
+发布前会验证源码哈希、graph 结构、原生 ELF 依赖、版本输出及真实 TUI 启动。详见 [CI 文档](docs/ci.md)、[原生组件说明](docs/native-assets.md) 和 [维护手册](docs/maintaining.md)。
 
 ## 从源码构建
 

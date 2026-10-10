@@ -29,12 +29,35 @@ the Bun base, NDK generation or native ABI patches.
 
 ## Triggers
 
-- Pull requests run the Python and shell regression suite.
-- Pushes to `main` also produce a 14-day Action artifact.
-- The six-hour schedule checks the official OpenCode latest release. A version
-  without an existing repository tag is built, tested and published.
-- `workflow_dispatch` accepts an explicit version. Set `publish=true` to create
-  a release after all Bionic checks pass.
+| Trigger | What runs |
+| --- | --- |
+| Pull request | `resolve` and the regression tests only |
+| Push to `main` | Full Bionic build and tests of the latest OpenCode; published only if that version has no release yet |
+| Daily (03:17 UTC) | Checks the official latest release; a version without a release is built, tested and published |
+| `workflow_dispatch` | Builds the given version; `recut=true` re-releases an already released version as `vX.Y.Z-rN` |
+
+Add `[skip ci]` to a commit message to skip the push build, then re-release
+with `gh workflow run build.yml -f version=latest -f recut=true` if needed.
+
+## Releases
+
+- Tags are `vX.Y.Z`. A re-release of the same OpenCode version after toolchain
+  changes (Bun base, patches, native assets) is `vX.Y.Z-rN`.
+- The release job only creates releases; it never edits or re-uploads one.
+  With immutable releases enabled in the repository settings, GitHub also
+  enforces this and reserves a published tag name forever, so a yanked
+  release is re-cut as the next `-rN`; the release job does that
+  automatically when GitHub rejects a reserved name.
+- The tag is created with `--target` on the commit the run built.
+- Only the highest OpenCode version may be marked Latest, so re-cutting an
+  older version never rolls `install.sh` users back.
+- Release notes list the toolchain commits since the previous release
+  (excluding `docs/`, `tests/` and Markdown).
+- `build-manifest.json` keeps `tag_name` as `vX.Y.Z` even for a re-cut: the
+  bundled `Installation.latest()`, and the TUI's automatic update check behind
+  it, compares versions. `opencode update`, `opencode upgrade` and
+  `install.sh` compare `output_sha256` with the installed binary instead, so a
+  re-cut is offered explicitly but never reinstalled in the background.
 
 ## Trust boundaries
 
@@ -42,7 +65,7 @@ the Bun base, NDK generation or native ABI patches.
 - OpenCode release assets, Bionic Bun and all native source archives are checked
   against pinned SHA-256 values or GitHub release digests.
 - The build job has read-only repository permission.
-- Only the final release job receives `contents: write`.
+- Only the release job receives `contents: write`.
 - A release is never created when the TUI smoke is skipped or fails.
 
 The cross-build `SKIP_RUN=1` mode remains available for structural debugging,

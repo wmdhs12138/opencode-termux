@@ -1,5 +1,18 @@
 name: build
 
+# OpenCode is MIT, so the release job publishes the built binary itself.
+#
+#   resolve -- picks the OpenCode version and the release tag (vX.Y.Z, or
+#              vX.Y.Z-rN for a manual re-cut after toolchain changes) and
+#              decides whether anything new needs to be released.
+#   tests   -- Python and shell regression tests; pull requests stop here.
+#   bionic  -- ARM64 runner + pinned termux-docker. Builds the Bionic native
+#              assets and the graft, then executes them; contents stay read-only.
+#   release -- the only job with write permission; publishes the package.
+#
+# Toolchain changes are not released on their own: they ship with the next
+# OpenCode version, or now via workflow_dispatch with recut=true. See docs/ci.md.
+
 on:
   push:
     branches: [main]
@@ -11,9 +24,9 @@ on:
         required: true
         default: latest
         type: string
-      publish:
-        description: Publish a GitHub Release after Bionic smoke passes
-        required: true
+      recut:
+        description: Re-release an already released version (toolchain changed)
+        required: false
         default: false
         type: boolean
   schedule:
@@ -31,11 +44,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
       unreleased: ${{ steps.version.outputs.unreleased }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # tags tell us what is already released
           persist-credentials: false
 
       - name: Resolve requested OpenCode version
@@ -43,22 +57,38 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.version || 'latest' }}
+          RECUT: ${{ github.event_name == 'workflow_dispatch' && inputs.recut || 'false' }}
         run: |
           set -euo pipefail
           if [ "$REQUESTED" = latest ]; then
-            version="$(gh api repos/anomalyco/opencode/releases/latest --jq '.tag_name | ltrimstr("v")')"
+            V="$(gh api repos/anomalyco/opencode/releases/latest --jq '.tag_name | ltrimstr("v")')"
           else
-            version="${REQUESTED#v}"
+            V="${REQUESTED#v}"
           fi
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::invalid OpenCode version: $version"
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::invalid OpenCode version: $V"
             exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          if git tag -l "v$version" | grep -q .; then
-            echo "unreleased=false" >> "$GITHUB_OUTPUT"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          # An immutable release reserves its tag name forever, so a re-cut
+          # (or a yanked release) becomes v$V-rN; both forms count as released.
+          TAGS="$(git tag -l)"
+          if grep -qE "^v$V(-r[0-9]+)?$" <<<"$TAGS"; then
+            if [ "$RECUT" = true ]; then
+              N=1
+              while grep -qx "v$V-r$N" <<<"$TAGS"; do N=$((N+1)); done
+              echo "tag=v$V-r$N" >> "$GITHUB_OUTPUT"
+              echo "unreleased=true" >> "$GITHUB_OUTPUT"
+              echo "re-cutting v$V as v$V-r$N"
+            else
+              echo "tag=v$V" >> "$GITHUB_OUTPUT"
+              echo "unreleased=false" >> "$GITHUB_OUTPUT"
+              echo "v$V already has a release"
+            fi
           else
+            echo "tag=v$V" >> "$GITHUB_OUTPUT"
             echo "unreleased=true" >> "$GITHUB_OUTPUT"
+            echo "v$V is unreleased"
           fi
 
   tests:
@@ -131,17 +161,22 @@ jobs:
 
   release:
     needs: [resolve, bionic]
-    if: >-
-      (github.event_name == 'schedule' && needs.resolve.outputs.unreleased == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    if: needs.resolve.outputs.unreleased == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ needs.bionic.outputs.version }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+      TAG: ${{ needs.resolve.outputs.tag }}
       PACKAGE: ${{ needs.bionic.outputs.package }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # previous release tags, for the notes
+          persist-credentials: false
+
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.bionic.outputs.package }}
@@ -150,29 +185,61 @@ jobs:
       - name: Publish verified Bionic release
         run: |
           set -euo pipefail
-          cat > release-notes.md <<EOF
-          OpenCode v$VERSION for Termux / Android AArch64.
+          ASSETS="artifact/$PACKAGE.zip artifact/$PACKAGE.zip.sha256 artifact/build-manifest.json"
+          for f in $ASSETS; do
+            [ -f "$f" ] || { echo "::error::missing asset $f"; exit 1; }
+          done
+          (cd artifact && sha256sum -c "$PACKAGE.zip.sha256")
 
-          Built from the official anomalyco/opencode release inside the pinned
-          Termux Bionic container. Native ELF audit, FFF, watcher, PTY and real
-          TUI smoke tests passed before publication.
-
-          Install:
-
-              curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh | bash
-          EOF
-          assets=(
-            "artifact/$PACKAGE.zip"
-            "artifact/$PACKAGE.zip.sha256"
-            "artifact/build-manifest.json"
-          )
-          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" --repo "$GITHUB_REPOSITORY" \
-              --clobber "${assets[@]}"
-            gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" \
-              --title "OpenCode $VERSION · Termux" --notes-file release-notes.md
+          # Toolchain changes since the previous release, for the notes: the
+          # highest version tag this commit contains. Not `git describe`, which
+          # picks arbitrarily when two releases share a commit.
+          PREV="$(git tag -l 'v*' --merged "$GITHUB_SHA" | grep -vxF "$TAG" | sort -V | tail -1 || true)"
+          if [ -n "$PREV" ]; then
+            git log --oneline --no-decorate "$PREV..$GITHUB_SHA" -- . \
+              ':(exclude)docs' ':(exclude)tests' ':(exclude)*.md' > changelog.txt
           else
-            gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" \
-              --title "OpenCode $VERSION · Termux" \
-              --notes-file release-notes.md "${assets[@]}"
+            : > changelog.txt
           fi
+
+          # /releases/latest is what install.sh and `opencode upgrade` follow.
+          # Only the highest OpenCode version may hold it, so re-cutting an
+          # older version cannot roll every installation back.
+          HIGHEST="$(git tag -l 'v*' | sed -nE 's/^v([0-9]+\.[0-9]+\.[0-9]+)(-r[0-9]+)?$/\1/p' \
+                     | sort -V | tail -1)"
+          LATEST=true
+          if [ -n "$HIGHEST" ] && [ "$(printf '%s\n%s\n' "$HIGHEST" "$VERSION" | sort -V | tail -1)" != "$VERSION" ]; then
+            LATEST=false
+          fi
+
+          # --target pins the tag to the commit this run built.
+          publish() {
+            python3 .github/release_notes.py notes.md \
+              --manifest artifact/build-manifest.json --tag "$1" \
+              --commit "$GITHUB_SHA" --predecessor "${PREV:--}" --changelog changelog.txt
+            title="OpenCode $VERSION · Termux"
+            case "$1" in *-r*) title="$title (${1##*-})" ;; esac
+            gh release create "$1" --target "$GITHUB_SHA" \
+              --latest="$LATEST" --title "$title" --notes-file notes.md $ASSETS
+          }
+
+          # A deleted immutable release still reserves its tag name. If the API
+          # rejects the name, take the next free v$VERSION-rN.
+          set +e
+          OUT="$(publish "$TAG" 2>&1)"
+          RC=$?
+          set -e
+          printf '%s\n' "$OUT"
+          if [ "$RC" != "0" ]; then
+            if ! printf '%s' "$OUT" | grep -q 'immutable release'; then
+              exit "$RC"
+            fi
+            N=1
+            while git ls-remote --tags origin "refs/tags/v$VERSION-r$N" | grep -q .; do
+              N=$((N+1))
+            done
+            echo "$TAG is reserved by an immutable release; re-cutting as v$VERSION-r$N"
+            TAG="v$VERSION-r$N"
+            publish "$TAG"
+          fi
+          echo "released $TAG"

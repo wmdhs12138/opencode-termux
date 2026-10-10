@@ -85,13 +85,20 @@ fi
 INPUT_SHA="$(sha256sum "$INPUT_ELF" | cut -d' ' -f1)"
 OUTPUT_SHA="$(sha256sum "$CANDIDATE" | cut -d' ' -f1)"
 GRAPH_SHA="$(sha256sum "$CURRENT" | cut -d' ' -f1)"
+BUN_SHA="$(sha256sum "$BUN" | cut -d' ' -f1)"
 python3 - "$WORK/manifest.json.new" "$VERSION" "$INPUT_SHA" "$OUTPUT_SHA" "$GRAPH_SHA" "$REQUIRE_ALL_BIONIC" "$TUI_SMOKE" \
-  "$WORK/extract.json" "$WORK/native-after.json" "$WORK/verify-graft.json" <<'PY'
+  "$WORK/extract.json" "$WORK/native-after.json" "$WORK/verify-graft.json" \
+  "$ROOT/versions.json" "$BUN_SHA" <<'PY'
 import json, sys
-out, version, input_sha, output_sha, graph_sha, strict, tui_smoke, extract, audit, graft = sys.argv[1:]
+(out, version, input_sha, output_sha, graph_sha, strict, tui_smoke, extract, audit, graft,
+ versions, bun_sha) = sys.argv[1:]
 def load(path):
     with open(path) as f:
         return json.load(f)
+pinned = load(versions)["base_bun"]
+# A BUN override that is not the pinned base is recorded as such.
+base_bun = {"version": pinned["version"] if bun_sha == pinned["binary_sha256"] else "unpinned",
+            "binary_sha256": bun_sha}
 doc = {
     "opencode": version,
     "tag_name": "v" + version,
@@ -101,6 +108,7 @@ doc = {
     "extract": load(extract),
     "native_assets": load(audit),
     "graft": load(graft),
+    "base_bun": base_bun,
     "tui_smoke": tui_smoke,
     "structurally_verified": strict == "1",
     "release_eligible": strict == "1" and tui_smoke == "pass",
