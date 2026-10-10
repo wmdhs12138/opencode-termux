@@ -141,6 +141,42 @@ class GraftTests(unittest.TestCase):
         self.assertGreaterEqual(payload, self.BSS_END)
         self.assertEqual(out[self.SEG_END:payload], bytes(payload - self.SEG_END))
 
+    def test_native_assets_come_back_out_of_a_grafted_binary(self):
+        assets = {
+            "/$bunfs/root/libopentui-a1.so": b"opentui",
+            "/$bunfs/root/libfff_c-b2.so": b"fff",
+            "/$bunfs/root/watcher-c3.node": b"watcher",
+            "/$bunfs/root/librust_pty_arm64-d4.so": b"pty",
+            "/$bunfs/root/index.js": b"js",
+        }
+        data, records = bytearray(), bytearray()
+        for name, contents in assets.items():
+            record = bytearray(52)
+            struct.pack_into("<II", record, 0, len(data), len(name))
+            struct.pack_into("<II", record, 8, len(data) + len(name), len(contents))
+            data.extend(name.encode() + contents)
+            records.extend(record)
+        modules_at = len(data)
+        data.extend(records)
+        data.extend(struct.pack("<QIIIIII", len(data), modules_at, len(records), 0, 0, 0, 0))
+        data.extend(TRAILER)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / "bun").write_bytes(self.base_elf())
+            (root / "graph.bin").write_bytes(data)
+            tools = ROOT / "tools"
+            subprocess.run([sys.executable, str(tools / "revive_patch.py"), "--bun", str(root / "bun"),
+                            "--graph", str(root / "graph.bin"), "--out", str(root / "opencode")],
+                           check=True, capture_output=True)
+            proc = subprocess.run([sys.executable, str(tools / "dump_native_assets.py"),
+                                   str(root / "opencode"), str(root / "out")],
+                                  text=True, capture_output=True)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            found = dict(line.split("=", 1) for line in proc.stdout.split())
+            self.assertEqual(sorted(found), ["FFF_SO", "OPENTUI_SO", "RUST_PTY_SO", "WATCHER_NODE"])
+            self.assertEqual(pathlib.Path(found["OPENTUI_SO"]).read_bytes(), b"opentui")
+            self.assertEqual(pathlib.Path(found["WATCHER_NODE"]).name, "watcher-c3.node")
+
     def test_section_headers_survive_outside_the_mapped_range(self):
         out = self.graft(self.base_elf())
         filesz = struct.unpack_from("<Q", out, 64 + 32)[0]
