@@ -4,9 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PREFIX_PATH="${PREFIX:-/data/data/com.termux/files/usr}"
 OUT_DIR="${1:-$ROOT/work/native/opentui}"
+DISTRO="${ANDROID_BUILD_DISTRO:-android-build}"
 mkdir -p "$OUT_DIR"
 
-for command_name in curl patch clang; do
+for command_name in curl patch proot-distro clang; do
   command -v "$command_name" >/dev/null || { echo "build-opentui: $command_name is required" >&2; exit 1; }
 done
 [ -d "$PREFIX_PATH/aarch64-linux-android/lib" ] || {
@@ -70,10 +71,11 @@ ln -sf "$PREFIX_PATH/aarch64-linux-android/lib/libc++_shared.so" "$NDK_LIB/libc+
 ln -s . "$NDK_LIB/24"
 ln -s linux-aarch64 "$NDK/toolchains/llvm/prebuilt/linux-x86_64"
 
-# Zig is a static executable and runs in Termux directly. Not under proot:
-# Zig 0.16 writes files atomically with linkat(AT_EMPTY_PATH), which proot's
-# link2symlink rejects with EINVAL, and Zig aborts on that.
-bash "$ROOT/scripts/build-opentui-inner.sh" \
+# In the glibc container, not in Termux: there Zig sees a Bionic host and
+# fails to build its own build runner for it. Without link2symlink: Zig 0.16
+# writes files atomically with linkat(AT_EMPTY_PATH), which the hard-link
+# emulation rejects with EINVAL, and Zig aborts on that.
+proot-distro login --no-link2symlink "$DISTRO" -- bash "$ROOT/scripts/build-opentui-inner.sh" \
   "$STAGE/source" "$STAGE/zig" "$NDK" "$STAGE/tls-align.o" \
   "$OUT_DIR/.libopentui.new.so"
 

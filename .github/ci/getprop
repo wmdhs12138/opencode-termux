@@ -1,7 +1,0 @@
-#!/data/data/com.termux/files/usr/bin/sh
-# termux-docker has no Android property service and no getprop. Zig 0.16 runs
-# /system/bin/getprop to learn the API level when it starts on Bionic; answer
-# with the lowest level this port supports. Mounted by the workflow.
-case "$1" in
-  ro.build.version.sdk) echo 28 ;;
-esac
