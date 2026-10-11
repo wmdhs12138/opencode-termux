@@ -1,11 +1,11 @@
 SHELL := bash
 VERSION ?= latest
 
-# Termux:     fetch-bun, build-native, verify
-# glibc host: fetch-source, fetch-host-bun, build-opencode-pty, compile
+# Termux:     fetch-bun, build-native (exports the Android sysroot), verify
+# glibc host: fetch-source, fetch-host-bun, build-opentui, build-opencode-pty, compile
 # (scripts/compile.sh explains why compiling cannot happen inside Termux.)
 
-.PHONY: fetch-source fetch-bun fetch-host-bun build-watcher build-opentui build-fff build-rust-pty build-native build-opencode-pty compile verify smoke audit test clean
+.PHONY: fetch-source fetch-bun fetch-host-bun build-watcher build-opentui build-fff build-rust-pty export-android-sysroot build-native build-opencode-pty compile verify smoke audit test clean
 
 fetch-source:
 	bash scripts/fetch-source.sh $(VERSION)
@@ -19,7 +19,7 @@ fetch-host-bun:
 build-watcher: fetch-bun
 	bash scripts/build-watcher.sh
 
-build-opentui: fetch-bun
+build-opentui:
 	bash scripts/build-opentui.sh
 
 build-fff: fetch-bun
@@ -28,12 +28,15 @@ build-fff: fetch-bun
 build-rust-pty: fetch-bun
 	bash scripts/build-rust-pty.sh
 
-build-native: build-watcher build-opentui build-fff build-rust-pty
+export-android-sysroot:
+	bash scripts/export-android-sysroot.sh
+
+build-native: build-watcher build-fff build-rust-pty export-android-sysroot
 
 build-opencode-pty:
 	bash scripts/build-opencode-pty.sh
 
-compile: fetch-host-bun build-opencode-pty
+compile: fetch-host-bun build-opentui build-opencode-pty
 	SKIP_RUN=1 bash scripts/fetch-bun.sh
 	bash scripts/compile.sh
 

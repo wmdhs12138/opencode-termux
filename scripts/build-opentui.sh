@@ -1,17 +1,27 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
+# Build OpenTUI's native library for Android from source with Zig.
+#
+# Runs on a glibc AArch64 Linux host, cross-compiling against the Android
+# sysroot that scripts/export-android-sysroot.sh copies out of Termux. Zig 0.16
+# works in neither of the other places: in Termux it sees a Bionic host and
+# cannot build its own build runner for it, and under proot its atomic file
+# writes (linkat with AT_EMPTY_PATH) fail with EINVAL, which it aborts on.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PREFIX_PATH="${PREFIX:-/data/data/com.termux/files/usr}"
 OUT_DIR="${1:-$ROOT/work/native/opentui}"
-DISTRO="${ANDROID_BUILD_DISTRO:-android-build}"
-mkdir -p "$OUT_DIR"
+NDK="${ANDROID_NDK_HOME:-$ROOT/work/android-ndk}"
+mkdir -p "$OUT_DIR" "$ROOT/work/toolchains"
 
-for command_name in curl patch proot-distro clang; do
+[ "$(uname -s)-$(uname -m)" = Linux-aarch64 ] && [ ! -e /system/bin/linker64 ] || {
+  echo "build-opentui: run this on a glibc AArch64 Linux host" >&2
+  exit 1
+}
+for command_name in curl patch; do
   command -v "$command_name" >/dev/null || { echo "build-opentui: $command_name is required" >&2; exit 1; }
 done
-[ -d "$PREFIX_PATH/aarch64-linux-android/lib" ] || {
-  echo "build-opentui: install ndk-multilib and ndk-multilib-native-static" >&2
+[ -d "$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android" ] || {
+  echo "build-opentui: no Android sysroot at $NDK (scripts/export-android-sysroot.sh in Termux)" >&2
   exit 1
 }
 
@@ -36,13 +46,8 @@ fetch() {
 }
 
 SOURCE_ARCHIVE="$OUT_DIR/opentui-$VERSION.tar.gz"
-ZIG_ARCHIVE="$OUT_DIR/zig-$ZIG_VERSION.tar.xz"
+ZIG_ARCHIVE="$ROOT/work/toolchains/zig-$ZIG_VERSION.tar.xz"
 fetch "$SOURCE_URL" "$SOURCE_SHA" "$SOURCE_ARCHIVE"
-COMMON_ZIG="$ROOT/work/toolchains/zig-$ZIG_VERSION.tar.xz"
-if [ ! -f "$ZIG_ARCHIVE" ] && [ -f "$COMMON_ZIG" ] && \
-   [ "$(sha256sum "$COMMON_ZIG" | cut -d' ' -f1)" = "$ZIG_SHA" ]; then
-  cp -f "$COMMON_ZIG" "$ZIG_ARCHIVE"
-fi
 fetch "$ZIG_URL" "$ZIG_SHA" "$ZIG_ARCHIVE"
 
 STAGE="$(mktemp -d "$OUT_DIR/.build.XXXXXX")"
@@ -50,38 +55,25 @@ trap 'rm -rf "$STAGE" "$OUT_DIR/.libopentui.new.so"' EXIT
 mkdir -p "$STAGE/source" "$STAGE/zig"
 tar -xzf "$SOURCE_ARCHIVE" -C "$STAGE/source" --strip-components=1
 tar -xJf "$ZIG_ARCHIVE" -C "$STAGE/zig" --strip-components=1
-patch -d "$STAGE/source" -p1 < "$ROOT/patches/opentui-android.patch"
-# The Zig dependencies are vendored in the archive. Unpack them here rather than
-# with packages/native/scripts/prepare-zig-deps.sh: inside proot-distro in CI
-# that script never returned, and its lock retries a failed `ln` without pause.
-mkdir -p "$STAGE/source/packages/native/zig-deps"
-tar -xzf "$STAGE/source/packages/native/src/vendor/zig-deps.tar.gz" \
-  -C "$STAGE/source/packages/native/zig-deps"
-clang -c -fPIC "$ROOT/native/tls-align.S" -o "$STAGE/tls-align.o"
+patch -d "$STAGE/source" -p1 --fuzz=0 --batch < "$ROOT/patches/opentui-android.patch"
+# The Zig dependencies are vendored in the archive; this is all
+# packages/native/scripts/prepare-zig-deps.sh does, minus its hard-link lock.
+NATIVE="$STAGE/source/packages/native"
+mkdir -p "$NATIVE/zig-deps"
+tar -xzf "$NATIVE/src/vendor/zig-deps.tar.gz" -C "$NATIVE/zig-deps"
 
-NDK="$STAGE/termux-ndk"
-HOST="$NDK/toolchains/llvm/prebuilt/linux-aarch64"
-NDK_LIB="$HOST/sysroot/usr/lib/aarch64-linux-android"
-mkdir -p "$NDK_LIB"
-ln -s "$PREFIX_PATH/include" "$HOST/sysroot/usr/include"
-for library in "$PREFIX_PATH/aarch64-linux-android/lib/"*; do
-  ln -s "$library" "$NDK_LIB/$(basename "$library")"
-done
-ln -sf "$PREFIX_PATH/aarch64-linux-android/lib/libc++_shared.so" "$NDK_LIB/libc++.so"
-ln -s . "$NDK_LIB/24"
-ln -s linux-aarch64 "$NDK/toolchains/llvm/prebuilt/linux-x86_64"
+(
+  cd "$NATIVE"
+  export ANDROID_NDK_HOME="$NDK"
+  export OPENCODE_TERMUX_TLS_ALIGN="$ROOT/native/tls-align.S"
+  timeout --kill-after=60 2700 "$STAGE/zig/zig" build \
+    --cache-dir "$STAGE/cache" --global-cache-dir "$ROOT/work/toolchains/zig-cache" \
+    -Dlibrary-target=aarch64-linux-android -Doptimize=ReleaseFast --summary failures
+)
+cp -L "$NATIVE/lib/aarch64-linux-android/libopentui.so" "$OUT_DIR/.libopentui.new.so"
 
-# In the glibc container, not in Termux: there Zig sees a Bionic host and
-# fails to build its own build runner for it. Without link2symlink: Zig 0.16
-# writes files atomically with linkat(AT_EMPTY_PATH), which the hard-link
-# emulation rejects with EINVAL, and Zig aborts on that.
-proot-distro login --no-link2symlink "$DISTRO" -- bash "$ROOT/scripts/build-opentui-inner.sh" \
-  "$STAGE/source" "$STAGE/zig" "$NDK" "$STAGE/tls-align.o" \
-  "$OUT_DIR/.libopentui.new.so"
-
-python3 "$ROOT/tools/elf_native.py" "$OUT_DIR/.libopentui.new.so" >/dev/null
-"$ROOT/work/bun-android/bun" "$ROOT/tools/opentui_smoke.ts" \
-  "$OUT_DIR/.libopentui.new.so" > "$OUT_DIR/smoke.json"
+# Loaded in Termux by scripts/verify.sh (tools/opentui_smoke.ts and the TUI).
+python3 "$ROOT/tools/elf_native.py" "$OUT_DIR/.libopentui.new.so" > "$OUT_DIR/elf.json"
 mv -f "$OUT_DIR/.libopentui.new.so" "$OUT_DIR/libopentui.so"
 sha256sum "$OUT_DIR/libopentui.so" | cut -d' ' -f1 > "$OUT_DIR/libopentui.so.sha256"
 printf 'build-opentui: OK: %s\n' "$OUT_DIR/libopentui.so"

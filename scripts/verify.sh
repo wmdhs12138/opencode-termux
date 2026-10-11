@@ -31,6 +31,12 @@ REPORTED="$("$CANDIDATE" --version)"
   echo "verify: --version reports '$REPORTED', expected $VERSION" >&2
   exit 1
 }
+# OpenTUI is built on the glibc host; this is where Bionic first loads it.
+"$ROOT/work/bun-android/bun" "$ROOT/tools/opentui_smoke.ts" "$ROOT/work/native/opentui/libopentui.so" \
+  > "$WORK/opentui-smoke.log" 2>&1 || {
+  echo "verify: libopentui.so does not load; inspect $WORK/opentui-smoke.log" >&2
+  exit 1
+}
 python3 "$ROOT/tools/serve_smoke.py" "$CANDIDATE" 120 > "$WORK/fff-smoke.log" || {
   echo "verify: file search through the server failed; inspect $WORK/fff-smoke.log" >&2
   exit 1
@@ -51,7 +57,7 @@ grep -q termux-smoke "$WORK/pty-smoke.log" && grep -q checkpoint "$WORK/pty-smok
 python3 - "$DIST/compile.json" "$DIST/build-manifest.json.new" <<'PY'
 import json, sys
 doc = json.load(open(sys.argv[1]))
-doc["smoke"] = {"version": "pass", "file_search": "pass", "pty": "pass"}
+doc["smoke"] = {"version": "pass", "opentui": "pass", "file_search": "pass", "pty": "pass"}
 doc["tui_smoke"] = "pass"
 doc["structurally_verified"] = doc["native_assets"].get("result") == "pass"
 doc["release_eligible"] = doc["structurally_verified"]

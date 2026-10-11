@@ -10,15 +10,18 @@ ubuntu-24.04-arm GitHub runner
 ├── termux-docker (pinned): bionic-build.sh natives
 │   ├── make test
 │   ├── Termux clang + Android NDK libraries
-│   ├── Ubuntu proot (host-side Rust 1.90 and Zig 0.15.2 only)
-│   └── build the four Bionic native assets, with their FFF / watcher / PTY smoke
+│   ├── Ubuntu proot (host-side Rust 1.90 only)
+│   ├── build watcher, FFF and bun-pty for Bionic, with their smoke tests
+│   └── export the Android sysroot to the workspace
 ├── runner (glibc): make fetch-source && make compile
+│   ├── OpenTUI with Zig 0.16 against that sysroot
+│   ├── opencode-pty as a static musl executable, as upstream builds it
 │   ├── OpenCode source of the tag's commit + patches/opencode-*.patch
-│   ├── bun install, Bionic assets swapped into node_modules
+│   ├── bun install, the native assets swapped into node_modules
 │   └── bun build --compile, embedded into the pinned Android Bun
 └── termux-docker (pinned): bionic-build.sh verify
-    ├── --version, update, file search through the patched FFF wrapper
-    ├── the real OpenCode TUI smoke test
+    ├── --version, OpenTUI load, file search through `opencode serve`
+    ├── an opencode-pty session and the real OpenCode TUI smoke test
     └── package
 ```
 
