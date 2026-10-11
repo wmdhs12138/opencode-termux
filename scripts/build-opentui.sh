@@ -25,15 +25,17 @@ done
   exit 1
 }
 
-read -r VERSION SOURCE_URL SOURCE_SHA ZIG_VERSION ZIG_URL ZIG_SHA < <(
+read -r VERSION SOURCE_URL SOURCE_SHA ZIG_VERSION ZIG_URL ZIG_SHA API < <(
   python3 - "$ROOT/versions.json" <<'PY'
 import json, sys
 x = json.load(open(sys.argv[1]))
 p, z = x["opentui"], x["zig"]
 print(p["version"], p["source_url"], p["source_sha256"],
-      z["version"], z["aarch64_linux_url"], z["aarch64_linux_sha256"])
+      z["version"], z["aarch64_linux_url"], z["aarch64_linux_sha256"], x["android_ndk"]["api"])
 PY
 )
+# The NDK headers refuse a target without an API level.
+TARGET="aarch64-linux-android.$API"
 
 fetch() {
   local url="$1" expected="$2" output="$3"
@@ -68,9 +70,9 @@ tar -xzf "$NATIVE/src/vendor/zig-deps.tar.gz" -C "$NATIVE/zig-deps"
   export OPENCODE_TERMUX_TLS_ALIGN="$ROOT/native/tls-align.S"
   timeout --kill-after=60 2700 "$STAGE/zig/zig" build \
     --cache-dir "$STAGE/cache" --global-cache-dir "$ROOT/work/toolchains/zig-cache" \
-    -Dlibrary-target=aarch64-linux-android -Doptimize=ReleaseFast --summary failures
+    -Dlibrary-target="$TARGET" -Doptimize=ReleaseFast --summary failures
 )
-cp -L "$NATIVE/lib/aarch64-linux-android/libopentui.so" "$OUT_DIR/.libopentui.new.so"
+cp -L "$NATIVE/lib/$TARGET/libopentui.so" "$OUT_DIR/.libopentui.new.so"
 
 # Loaded in Termux by scripts/verify.sh (tools/opentui_smoke.ts and the TUI).
 python3 "$ROOT/tools/elf_native.py" "$OUT_DIR/.libopentui.new.so" > "$OUT_DIR/elf.json"
