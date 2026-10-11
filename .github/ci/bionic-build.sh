@@ -51,8 +51,9 @@ natives() {
 }
 
 verify() {
+  # A fresh container: nothing from the natives phase is installed.
   pkg update -y
-  pkg install -y coreutils python zip
+  pkg install -y coreutils make python zip
   make verify
 
   VERSION="$(python3 -c 'import json; print(json.load(open("dist/build-manifest.json"))["opencode"])')"

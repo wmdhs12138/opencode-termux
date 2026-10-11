@@ -25,8 +25,9 @@ SHA="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["output_
   exit 1
 }
 
-"$CANDIDATE" --version | grep -qxF "$VERSION" || {
-  echo "verify: --version does not report $VERSION" >&2
+REPORTED="$("$CANDIDATE" --version)"
+[ "$REPORTED" = "$VERSION" ] || {
+  echo "verify: --version reports '$REPORTED', expected $VERSION" >&2
   exit 1
 }
 # Network failures are reported by the command and still exit 0.
