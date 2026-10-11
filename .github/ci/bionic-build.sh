@@ -22,10 +22,13 @@ cd "$ROOT"
 echo 'deb https://packages.termux.dev/apt/termux-main stable main' > "$PREFIX/etc/apt/sources.list"
 export TERMUX_PKG_NO_MIRROR_SELECT=1
 
+# What `make test` needs.
+TEST_PACKAGES=(bash coreutils curl file git make patch python unzip zip)
+
 natives() {
   if [ "${1:-}" = cached ] && [ -f work/native/BUILD-INFO.txt ] && [ -d work/android-ndk ]; then
     pkg update -y
-    pkg install -y make python
+    pkg install -y "${TEST_PACKAGES[@]}"
     make test
     echo "bionic-build: reusing the native assets of an earlier run with the same inputs"
     return
@@ -33,9 +36,8 @@ natives() {
 
   echo "::group::Install Termux build dependencies"
   pkg update -y
-  pkg install -y \
-    bash binutils clang coreutils curl file git make nodejs patch procps python unzip zip \
-    proot-distro ndk-multilib ndk-multilib-native-static
+  pkg install -y "${TEST_PACKAGES[@]}" \
+    binutils clang nodejs procps proot-distro ndk-multilib ndk-multilib-native-static
   echo "::endgroup::"
 
   echo "::group::Prepare glibc host tools"
