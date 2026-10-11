@@ -10,8 +10,10 @@ an unpatched wrapper crashes Bun on the first result it reads.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
+import secrets
 import signal
 import socket
 import subprocess
@@ -47,9 +49,17 @@ def main() -> int:
             f.write("export {}\n")
         env = {key: value for key, value in os.environ.items() if not key.startswith("XDG_")}
         env["HOME"] = home
+        # The server requires Basic auth as "opencode"; it generates a password
+        # unless one is given.
+        password = secrets.token_urlsafe(24)
+        env["OPENCODE_SERVER_PASSWORD"] = password
+        credentials = base64.b64encode(f"opencode:{password}".encode()).decode()
         port = free_port()
         query = urllib.parse.urlencode({"query": "readme", "location[directory]": project})
-        url = f"http://127.0.0.1:{port}/api/fs/find?{query}"
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/fs/find?{query}",
+            headers={"Authorization": f"Basic {credentials}"},
+        )
 
         log_path = os.path.join(tmp, "serve.log")
         with open(log_path, "wb") as log:
@@ -63,7 +73,7 @@ def main() -> int:
             try:
                 while time.monotonic() < deadline and server.poll() is None:
                     try:
-                        with urllib.request.urlopen(url, timeout=10) as response:
+                        with urllib.request.urlopen(request, timeout=10) as response:
                             body = response.read().decode("utf-8", "replace")
                         if "README.md" in body:
                             break
