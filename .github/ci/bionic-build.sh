@@ -14,6 +14,12 @@ IMAGE="${2:-unknown}"
 DISTRO="${ANDROID_BUILD_DISTRO:-ubuntu}"
 cd "$ROOT"
 
+# The image has no chosen mirror, so every `pkg` call picks a random one and
+# rewrites sources.list; one answering 429 failed a release build. Use the
+# official repository, as codex-termux does.
+echo 'deb https://packages.termux.dev/apt/termux-main stable main' > "$PREFIX/etc/apt/sources.list"
+export TERMUX_PKG_NO_MIRROR_SELECT=1
+
 natives() {
   echo "::group::Install Termux build dependencies"
   pkg update -y
