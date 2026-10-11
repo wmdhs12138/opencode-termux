@@ -1,8 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # The Termux halves of the bionic job, run inside termux-docker:
 #
-#   bionic-build.sh natives        test, then build the four Bionic native assets
-#   bionic-build.sh verify IMAGE   run the compiled candidate, then package it
+#   bionic-build.sh natives [cached]  test, then build the Bionic native assets
+#                                     and export the Android sysroot; with
+#                                     `cached`, the workflow restored them
+#   bionic-build.sh verify IMAGE      run the compiled candidate, then package it
 #
 # Between them the runner itself compiles OpenCode (scripts/compile.sh).
 # Arguments, not `docker run -e`: the image's entrypoint drops the environment.
@@ -21,6 +23,14 @@ echo 'deb https://packages.termux.dev/apt/termux-main stable main' > "$PREFIX/et
 export TERMUX_PKG_NO_MIRROR_SELECT=1
 
 natives() {
+  if [ "${1:-}" = cached ] && [ -f work/native/BUILD-INFO.txt ] && [ -d work/android-ndk ]; then
+    pkg update -y
+    pkg install -y make python
+    make test
+    echo "bionic-build: reusing the native assets of an earlier run with the same inputs"
+    return
+  fi
+
   echo "::group::Install Termux build dependencies"
   pkg update -y
   pkg install -y \
@@ -107,7 +117,7 @@ PY
 }
 
 case "$PHASE" in
-  natives) natives ;;
+  natives) natives "${2:-}" ;;
   verify) verify ;;
   *) echo "bionic-build: unknown phase $PHASE" >&2; exit 2 ;;
 esac

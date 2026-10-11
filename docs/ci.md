@@ -16,7 +16,7 @@ ubuntu-24.04-arm GitHub runner
 ├── runner (glibc): make fetch-source && make compile
 │   ├── OpenTUI with Zig 0.16 against that sysroot
 │   ├── opencode-pty as a static musl executable, as upstream builds it
-│   ├── OpenCode source of the tag's commit + patches/opencode-*.patch
+│   ├── OpenCode source of the tag's commit + patches/opencode-NNNN-*.patch
 │   ├── bun install, the native assets swapped into node_modules
 │   └── bun build --compile, embedded into the pinned Android Bun
 └── termux-docker (pinned): bionic-build.sh verify
@@ -24,6 +24,11 @@ ubuntu-24.04-arm GitHub runner
     ├── an opencode-pty session and the real OpenCode TUI smoke test
     └── package
 ```
+
+The Termux-built assets (watcher, FFF, bun-pty and the exported sysroot) are
+cached under a key that hashes every input they are built from: `versions.json`,
+their scripts, patches and smoke tests. A run whose inputs match an earlier one
+restores them and only runs the tests in that phase; any change rebuilds them.
 
 OpenCode is compiled on the runner because the Android Bun bakes
 `process.platform === "android"` into a bundle, and OpenCode's native

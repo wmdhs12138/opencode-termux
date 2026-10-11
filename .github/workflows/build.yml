@@ -119,7 +119,20 @@ jobs:
         with:
           persist-credentials: false
 
+      # The Termux-built assets depend only on these inputs, and FFF alone
+      # takes a quarter of an hour: reuse them while the inputs are unchanged.
+      - name: Restore the Bionic native assets
+        id: natives
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            work/native
+            work/android-ndk
+          key: bionic-natives-${{ hashFiles('versions.json', 'native/**', 'patches/bun-pty-android.patch', 'scripts/build-watcher.sh', 'scripts/build-fff*.sh', 'scripts/build-rust-pty*.sh', 'scripts/android-clang*', 'scripts/export-android-sysroot.sh', 'scripts/fetch-bun.sh', 'tools/elf_native.py', 'tools/rewrite_needed.py', 'tools/*_smoke.ts', 'tools/watcher_smoke.js', '.github/ci/bionic-build.sh') }}
+
       - name: Build the Bionic native assets inside Termux
+        env:
+          CACHED: ${{ steps.natives.outputs.cache-hit == 'true' && 'cached' || 'build' }}
         run: |
           set -euo pipefail
           docker pull "$TERMUX_DOCKER_IMAGE"
@@ -128,8 +141,17 @@ jobs:
             -v "$GITHUB_WORKSPACE:/data/data/com.termux/files/home/opencode-termux" \
             -w /data/data/com.termux/files/home/opencode-termux \
             "$TERMUX_DOCKER_IMAGE" \
-            bash .github/ci/bionic-build.sh natives
+            bash .github/ci/bionic-build.sh natives "$CACHED"
           sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+
+      - name: Save the Bionic native assets
+        if: steps.natives.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            work/native
+            work/android-ndk
+          key: ${{ steps.natives.outputs.cache-primary-key }}
 
       # Upstream's install scripts run node-gyp, which needs a current Node.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

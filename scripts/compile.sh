@@ -46,7 +46,8 @@ VERSION="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["ver
 echo "::group::Patch OpenCode $VERSION"
 rm -rf "$SRC"
 cp -a "$SOURCE" "$SRC"
-for patch in "$ROOT"/patches/opencode-*.patch; do
+# Numbered: patches/opencode-pty-*.patch belongs to scripts/build-opencode-pty.sh.
+for patch in "$ROOT"/patches/opencode-[0-9]*.patch; do
   patch -p1 --fuzz=0 --batch --forward --no-backup-if-mismatch -d "$SRC" -i "$patch" >/dev/null || {
     echo "compile: $(basename "$patch") does not apply to OpenCode $VERSION" >&2
     exit 1

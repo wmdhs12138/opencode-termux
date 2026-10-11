@@ -47,7 +47,7 @@ opencode upgrade   # 也可以写成 opencode update
 
 ```text
 OpenCode vX.Y.Z 源码
-        │ Android 补丁（patches/opencode-*.patch）
+        │ Android 补丁（patches/opencode-NNNN-*.patch）
         │ bun install
         │ 换入从源码编译的原生组件（Bionic 库，静态 opencode-pty）
         ▼

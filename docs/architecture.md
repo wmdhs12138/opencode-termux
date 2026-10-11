@@ -9,7 +9,7 @@
 
 ```text
 OpenCode vX.Y.Z（tag 对应的提交）
-   │ patches/opencode-*.patch（fuzz 0）
+   │ patches/opencode-NNNN-*.patch（fuzz 0）
    │ bun install
    │ tools/swap_native_assets.py：从源码编译的原生组件替换 node_modules 里的 glibc 版
    │ bun build --compile --target bun-linux-arm64，executablePath = Android Bun
