@@ -200,6 +200,7 @@ jobs:
             work/native/*/*.json
             work/native/opentui/libopentui.so
             dist/compile.json
+            dist/.opencode.new
           retention-days: 3
           if-no-files-found: ignore
 

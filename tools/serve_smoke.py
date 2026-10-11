@@ -78,6 +78,8 @@ def main() -> int:
                         if "README.md" in body:
                             break
                         error = "README.md not in the results yet"
+                    except urllib.error.HTTPError as exc:
+                        error = f"{exc}: {exc.read().decode('utf-8', 'replace')[:2000]}"
                     except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
                         error = str(exc)
                     time.sleep(0.5)
@@ -101,6 +103,14 @@ def main() -> int:
         if not found:
             with open(log_path, "rb") as log:
                 sys.stderr.write(log.read()[-4000:].decode("utf-8", "replace"))
+            # OpenCode's own log, under the isolated home.
+            for directory, _, files in os.walk(home):
+                for name in files:
+                    if name.endswith(".log"):
+                        path = os.path.join(directory, name)
+                        with open(path, "rb") as log:
+                            sys.stderr.write(f"--- {os.path.relpath(path, home)}\n")
+                            sys.stderr.write(log.read()[-6000:].decode("utf-8", "replace"))
         return 0 if found else 1
 
 
