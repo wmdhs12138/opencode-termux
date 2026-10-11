@@ -98,14 +98,14 @@ class InstallTests(unittest.TestCase):
     def latest(self, tag):
         (self.gh / "latest").write_text(tag)
 
-    def install(self, version=None, **env):
+    def install(self, version=None, *args, **env):
         full = dict(os.environ, PATH=self.path, PREFIX=str(self.prefix), TMPDIR=str(self.tmp),
                     FAKE_GH=str(self.gh), FAKE_REPO=self.REPO, OPENCODE_TERMUX_REPO=self.REPO,
                     **env)
         full.pop("VERSION", None)
         if version:
             full["VERSION"] = version
-        return subprocess.run([BASH, str(INSTALL)], env=full, text=True, capture_output=True)
+        return subprocess.run([BASH, str(INSTALL), *args], env=full, text=True, capture_output=True)
 
     def installed(self):
         path = self.prefix / "bin" / "opencode"
@@ -164,6 +164,18 @@ class InstallTests(unittest.TestCase):
         self.latest("v1.2.3")
         self.assertOk(self.install("v1.2.2"))
         self.assertEqual(self.installed(), sha)
+
+    def test_opencode_2_upgrade_arguments(self):
+        # What OpenCode 2's `opencode upgrade` runs: --version X.Y.Z --no-modify-path.
+        self.release("v1.2.3")
+        sha = self.release("v1.2.3-r1")
+        self.release("v1.2.4")
+        self.latest("v1.2.4")
+        self.assertOk(self.install(None, "--version", "1.2.3", "--no-modify-path"))
+        self.assertEqual(self.installed(), sha)
+        proc = self.install(None, "--bogus")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("unknown option: --bogus", proc.stderr)
 
     def test_exact_recut_is_honored(self):
         sha = self.release("v1.2.3-r1")

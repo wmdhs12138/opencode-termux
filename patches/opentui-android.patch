@@ -1,40 +1,51 @@
-diff --git a/packages/core/src/zig/build.zig b/packages/core/src/zig/build.zig
---- a/packages/core/src/zig/build.zig
-+++ b/packages/core/src/zig/build.zig
-@@ -189,7 +189,7 @@ fn addNativeAudioDependencies(
- 
-     switch (target.result.os.tag) {
-         .macos => addMacOSSystemLibraries(b, artifact, macos_sdk_path.?),
--        .linux => {
-+        .linux => if (target.result.abi != .android) {
-             artifact.linkSystemLibrary("dl");
-             artifact.linkSystemLibrary("pthread");
+diff --git a/packages/native/build.zig b/packages/native/build.zig
+index b226da7..1f836c5 100644
+--- a/packages/native/build.zig
++++ b/packages/native/build.zig
+@@ -367,7 +367,8 @@ fn addNativeAudioDependencies(
+         .macos => addMacOSSystemLibraries(b, module, macos_sdk_path.?),
+         .linux => {
+             module.linkSystemLibrary("dl", .{});
+-            module.linkSystemLibrary("pthread", .{});
++            // Bionic has pthread in libc; there is no libpthread.so.
++            if (target.result.abi != .android) module.linkSystemLibrary("pthread", .{});
+             module.linkSystemLibrary("m", .{});
          },
-@@ -491,6 +491,27 @@ fn buildTarget(
-         .linkage = .dynamic,
+         else => {},
+@@ -711,6 +712,28 @@ fn buildSingleTarget(
+     try buildTarget(b, target_str, target_str, description, optimize, build_options, macos_sdk_path);
+ }
+ 
++// opencode-termux: link against the NDK sysroot that Termux's ndk-multilib
++// provides, and raise PT_TLS alignment to what Android's linker requires.
++fn addAndroidSysroot(b: *std.Build, lib: *std.Build.Step.Compile, module: *std.Build.Module) !void {
++    const ndk = b.graph.environ_map.get("ANDROID_NDK_HOME") orelse return error.AndroidNDKNotFound;
++    const sysroot = b.pathJoin(&.{ ndk, "toolchains", "llvm", "prebuilt", "linux-x86_64", "sysroot", "usr" });
++    const include = b.pathJoin(&.{ sysroot, "include" });
++    const library = b.pathJoin(&.{ sysroot, "lib", "aarch64-linux-android" });
++    const files = b.addWriteFiles();
++    lib.setLibCFile(files.add("libc.txt", b.fmt(
++        \\include_dir={s}
++        \\sys_include_dir={s}/aarch64-linux-android
++        \\crt_dir={s}/24
++        \\msvc_lib_dir=
++        \\kernel32_lib_dir=
++        \\gcc_dir=
++    , .{ include, include, library })));
++    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ include, "c++", "v1" }) });
++    module.addLibraryPath(.{ .cwd_relative = library });
++    const tls_align = b.graph.environ_map.get("OPENCODE_TERMUX_TLS_ALIGN") orelse return error.MissingTLSAlignmentAnchor;
++    module.addAssemblyFile(.{ .cwd_relative = tls_align });
++}
++
+ fn buildTarget(
+     b: *std.Build,
+     zig_target: []const u8,
+@@ -746,6 +769,7 @@ fn buildTarget(
      });
  
-+    if (target.result.abi == .android) {
-+        const ndk = b.graph.env_map.get("ANDROID_NDK_HOME") orelse return error.AndroidNDKNotFound;
-+        const sysroot = b.pathJoin(&.{ ndk, "toolchains", "llvm", "prebuilt", "linux-x86_64", "sysroot", "usr" });
-+        const include = b.pathJoin(&.{ sysroot, "include" });
-+        const library = b.pathJoin(&.{ sysroot, "lib", "aarch64-linux-android" });
-+        const libc_txt = b.fmt(
-+            \\include_dir={s}
-+            \\sys_include_dir={s}/aarch64-linux-android
-+            \\crt_dir={s}/24
-+            \\msvc_lib_dir=
-+            \\kernel32_lib_dir=
-+            \\gcc_dir=
-+        , .{ include, include, library });
-+        const files = b.addWriteFiles();
-+        lib.setLibCFile(files.add("libc.txt", libc_txt));
-+        lib.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ include, "c++", "v1" }) });
-+        lib.addLibraryPath(.{ .cwd_relative = library });
-+        const tls_align = b.graph.env_map.get("OPENCODE_TERMUX_TLS_ALIGN") orelse return error.MissingTLSAlignmentAnchor;
-+        lib.addAssemblyFile(.{ .cwd_relative = tls_align });
-+    }
-+
-     addNativeAudioDependencies(b, lib, target, macos_sdk_path);
-     addYogaDependencies(b, lib);
+     if (target.result.os.tag == .linux and optimize != .Debug) lib.build_id = .sha1;
++    if (target.result.abi == .android) try addAndroidSysroot(b, lib, module);
  
+     addNativeAudioDependencies(b, module, target, macos_sdk_path);
+     addYogaDependencies(b, module);

@@ -1,36 +1,19 @@
-diff --git a/src/ffi.ts b/src/ffi.ts
-index 75fb584..f1b25b5 100644
---- a/src/ffi.ts
-+++ b/src/ffi.ts
-@@ -330,12 +330,11 @@ function encodeString(s: string): Uint8Array {
- 
- /**
-  * Read a C string from a pointer
-- * Note: read.ptr() returns number but CString expects Pointer - we cast through unknown
-+ * Pointers are read as u64 bigints: Android AArch64 tags the top byte of heap
-+ * addresses, which a JavaScript number cannot hold exactly.
-  */
--function readCString(pointer: Pointer | number | null): string | null {
--  if (pointer === null || pointer === 0) return null;
--  // CString constructor accepts Pointer, but read.ptr returns number
--  // Cast through unknown for runtime compatibility
-+function readCString(pointer: Pointer | number | bigint | null): string | null {
-+  if (pointer === null || pointer === 0 || pointer === 0n) return null;
-   return new CString(pointer as unknown as Pointer).toString();
+diff --git a/dist/index.js b/dist/index.js
+index 4131b06..fc3b594 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -494,7 +494,7 @@ function encodeString(s) {
+   return new TextEncoder().encode(`${s}\x00`);
  }
- 
-@@ -387,7 +386,7 @@ const FCO_ENABLE_HOME_DIR_SCANNING = 81;
- 
- function readResultEnvelope(
-   resultPtr: Pointer | null,
--): { success: true; handlePtr: number; intValue: number } | Result<never> {
-+): { success: true; handlePtr: bigint; intValue: number } | Result<never> {
-   if (resultPtr === null) {
-     return err("FFI returned null pointer");
-   }
-@@ -396,13 +395,13 @@ function readResultEnvelope(
+ function readCString(pointer) {
+-  if (pointer === null || pointer === 0)
++  if (pointer === null || pointer === 0 || pointer === 0n)
+     return null;
+   return new CString(pointer).toString();
+ }
+@@ -540,12 +540,12 @@ function readResultEnvelope(resultPtr) {
+   const success = read.u8(resultPtr, RES_SUCCESS) !== 0;
    const library = loadLibrary();
- 
    if (!success) {
 -    const errorPtr = read.ptr(resultPtr, RES_ERROR);
 +    const errorPtr = read.u64(resultPtr, RES_ERROR);
@@ -38,44 +21,41 @@ index 75fb584..f1b25b5 100644
      library.symbols.fff_free_result(resultPtr);
      return err(errorMsg);
    }
- 
 -  const handlePtr = read.ptr(resultPtr, RES_HANDLE);
 +  const handlePtr = read.u64(resultPtr, RES_HANDLE);
    const intValue = Number(read.i64(resultPtr, RES_INT_VALUE));
    library.symbols.fff_free_result(resultPtr);
    return { success: true, handlePtr, intValue };
-@@ -427,7 +426,7 @@ function parseStringResult(resultPtr: Pointer | null): Result<string | null> {
+@@ -566,7 +566,7 @@ function parseStringResult(resultPtr) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
--  if (envelope.handlePtr === 0) return { ok: true, value: null };
-+  if (envelope.handlePtr === 0n) return { ok: true, value: null };
- 
+   if (!("success" in envelope))
+     return envelope;
+-  if (envelope.handlePtr === 0)
++  if (envelope.handlePtr === 0n)
+     return { ok: true, value: null };
    const library = loadLibrary();
    const str = readCString(envelope.handlePtr);
-@@ -440,7 +439,7 @@ function parseJsonResult<T>(resultPtr: Pointer | null): Result<T> {
+@@ -577,7 +577,7 @@ function parseJsonResult(resultPtr) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
--  if (envelope.handlePtr === 0) return { ok: true, value: undefined as T };
-+  if (envelope.handlePtr === 0n) return { ok: true, value: undefined as T };
- 
+   if (!("success" in envelope))
+     return envelope;
+-  if (envelope.handlePtr === 0)
++  if (envelope.handlePtr === 0n)
+     return { ok: true, value: undefined };
    const library = loadLibrary();
    const jsonStr = readCString(envelope.handlePtr);
-@@ -535,17 +534,17 @@ export function ffiCreate(
+@@ -625,15 +625,15 @@ function ffiCreate(basePath, frecencyDbPath, historyDbPath, _useUnsafeNoLock, en
+   }
    const success = read.u8(resultPtr, RES_SUCCESS) !== 0;
- 
    if (success) {
 -    const handlePtr = read.ptr(resultPtr, RES_HANDLE);
 +    const handlePtr = read.u64(resultPtr, RES_HANDLE);
-     const handle = handlePtr as unknown as Pointer;
+     const handle = handlePtr;
      library.symbols.fff_free_result(resultPtr);
- 
--    if (!handle || handle === (0 as unknown as Pointer)) {
+-    if (!handle || handle === 0) {
 +    if (handlePtr === 0n) {
        return err("fff_create_instance_with returned null handle");
      }
- 
      return { ok: true, value: handle };
    } else {
 -    const errorPtr = read.ptr(resultPtr, RES_ERROR);
@@ -83,20 +63,8 @@ index 75fb584..f1b25b5 100644
      const errorMsg = readCString(errorPtr) || "Unknown error";
      library.symbols.fff_free_result(resultPtr);
      return err(errorMsg);
-@@ -617,19 +616,19 @@ const SC_MTYPE = 40; // *mut c_char (8)
- const SC_SIZE_OF = 48;
- 
- /** Cast a number (raw address from pointer math) to Pointer for read.*. */
--function asPtr(n: number): Pointer {
-+function asPtr(n: bigint): Pointer {
-   return n as unknown as Pointer;
- }
- 
- /**
-  * Read an FffFileItem struct at the given raw address.
-  */
--function readFileItemStruct(p: number): FileItem {
-+function readFileItemStruct(p: bigint): FileItem {
+@@ -691,9 +691,9 @@ function asPtr(n) {
+ function readFileItemStruct(p) {
    const pp = asPtr(p);
    return {
 -    relativePath: readCString(read.ptr(pp, FI_RELPATH)) ?? "",
@@ -108,34 +76,24 @@ index 75fb584..f1b25b5 100644
      size: Number(read.u64(pp, FI_SIZE)),
      modified: Number(read.u64(pp, FI_MODIFIED)),
      accessFrecencyScore: Number(read.i64(pp, FI_ACCESS)),
-@@ -641,7 +640,7 @@ function readFileItemStruct(p: number): FileItem {
- /**
-  * Read an FffScore struct at the given raw address.
-  */
--function readScoreStruct(p: number): Score {
-+function readScoreStruct(p: bigint): Score {
-   const pp = asPtr(p);
-   return {
-     total: read.i32(pp, SC_TOTAL),
-@@ -653,7 +652,7 @@ function readScoreStruct(p: number): Score {
+@@ -713,7 +713,7 @@ function readScoreStruct(p) {
      currentFilePenalty: read.i32(pp, SC_CURFILE),
      comboMatchBoost: read.i32(pp, SC_COMBO),
      exactMatch: read.u8(pp, SC_EXACT) !== 0,
--    matchType: readCString(read.ptr(pp, SC_MTYPE)) ?? "",
-+    matchType: readCString(read.u64(pp, SC_MTYPE)) ?? "",
+-    matchType: readCString(read.ptr(pp, SC_MTYPE)) ?? ""
++    matchType: readCString(read.u64(pp, SC_MTYPE)) ?? ""
    };
  }
- 
-@@ -668,7 +667,7 @@ function parseSearchResult(resultPtr: Pointer | null): Result<SearchResult> {
+ function parseSearchResult(resultPtr) {
+@@ -723,15 +723,15 @@ function parseSearchResult(resultPtr) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
+   if (!("success" in envelope))
+     return envelope;
 -  if (envelope.handlePtr === 0) {
 +  if (envelope.handlePtr === 0n) {
      return err("fff_search returned null search result");
    }
- 
-@@ -676,8 +675,8 @@ function parseSearchResult(resultPtr: Pointer | null): Result<SearchResult> {
+   const hp = asPtr(envelope.handlePtr);
    const count = read.u32(hp, SR_COUNT);
    const totalMatched = read.u32(hp, SR_MATCHED);
    const totalFiles = read.u32(hp, SR_TOTAL);
@@ -143,103 +101,89 @@ index 75fb584..f1b25b5 100644
 -  const scoresBase = read.ptr(hp, SR_SCORES);
 +  const itemsBase = read.u64(hp, SR_ITEMS);
 +  const scoresBase = read.u64(hp, SR_SCORES);
- 
-   // Read location
    const locTag = read.u8(hp, SR_LOC_TAG);
-@@ -706,8 +705,8 @@ function parseSearchResult(resultPtr: Pointer | null): Result<SearchResult> {
-   const scores: Score[] = [];
- 
-   for (let i = 0; i < count; i++) {
+   let location;
+   if (locTag === 1) {
+@@ -755,8 +755,8 @@ function parseSearchResult(resultPtr) {
+   const items = [];
+   const scores = [];
+   for (let i = 0;i < count; i++) {
 -    items.push(readFileItemStruct(itemsBase + i * FI_SIZE_OF));
 -    scores.push(readScoreStruct(scoresBase + i * SC_SIZE_OF));
 +    items.push(readFileItemStruct(itemsBase + BigInt(i * FI_SIZE_OF)));
 +    scores.push(readScoreStruct(scoresBase + BigInt(i * SC_SIZE_OF)));
    }
- 
-   // Free native search result
-@@ -724,6 +723,8 @@ function parseSearchResult(resultPtr: Pointer | null): Result<SearchResult> {
- // FffDirSearchResult byte offsets (must match #[repr(C)] layout on 64-bit)
- // { items: *mut, scores: *mut, count: u32, total_matched: u32, total_dirs: u32 }
- // ---------------------------------------------------------------------------
-+const DSR_ITEMS = 0; // *mut FffDirItem (8)
-+const DSR_SCORES = 8; // *mut FffScore  (8)
- const DSR_COUNT = 16; // u32              (4)
- const DSR_MATCHED = 20; // u32              (4)
- const DSR_TOTAL_DIRS = 24; // u32              (4)
-@@ -732,15 +733,16 @@ const DSR_TOTAL_DIRS = 24; // u32              (4)
- const DI_RELPATH = 0; // *mut c_char (8)
- const DI_DIRNAME = 8; // *mut c_char (8)
- const DI_MAX_FRECENCY = 16; // i32         (4)
-+const DI_SIZE_OF = 24;
- 
- /**
-  * Read an FffDirItem struct at the given raw address.
-  */
--function readDirItemStruct(p: number): DirItem {
-+function readDirItemStruct(p: bigint): DirItem {
+   loadLibrary().symbols.fff_free_search_result(hp);
+   const result = { items, scores, totalMatched, totalFiles };
+@@ -765,17 +765,20 @@ function parseSearchResult(resultPtr) {
+   }
+   return { ok: true, value: result };
+ }
++var DSR_ITEMS = 0;
++var DSR_SCORES = 8;
+ var DSR_COUNT = 16;
+ var DSR_MATCHED = 20;
+ var DSR_TOTAL_DIRS = 24;
+ var DI_RELPATH = 0;
+ var DI_DIRNAME = 8;
+ var DI_MAX_FRECENCY = 16;
++var DI_SIZE_OF = 24;
+ function readDirItemStruct(p) {
    const pp = asPtr(p);
    return {
 -    relativePath: readCString(read.ptr(pp, DI_RELPATH)) ?? "",
 -    dirName: readCString(read.ptr(pp, DI_DIRNAME)) ?? "",
 +    relativePath: readCString(read.u64(pp, DI_RELPATH)) ?? "",
 +    dirName: readCString(read.u64(pp, DI_DIRNAME)) ?? "",
-     maxAccessFrecency: read.i32(pp, DI_MAX_FRECENCY),
+     maxAccessFrecency: read.i32(pp, DI_MAX_FRECENCY)
    };
  }
-@@ -758,7 +760,7 @@ function parseDirSearchResult(
+@@ -786,7 +789,7 @@ function parseDirSearchResult(resultPtr) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
+   if (!("success" in envelope))
+     return envelope;
 -  if (envelope.handlePtr === 0) {
 +  if (envelope.handlePtr === 0n) {
      return err("fff_search_directories returned null search result");
    }
- 
-@@ -772,14 +774,14 @@ function parseDirSearchResult(
-   const items: DirItem[] = [];
-   const scores: Score[] = [];
- 
+   const hp = asPtr(envelope.handlePtr);
+@@ -796,19 +799,21 @@ function parseDirSearchResult(resultPtr) {
+   const library = loadLibrary();
+   const items = [];
+   const scores = [];
 +  const itemsBase = read.u64(hp, DSR_ITEMS);
 +  const scoresBase = read.u64(hp, DSR_SCORES);
-   for (let i = 0; i < count; i++) {
+   for (let i = 0;i < count; i++) {
 -    const itemPtr = library.symbols.fff_dir_search_result_get_item(hp, i);
--    if (itemPtr !== null && (itemPtr as unknown as number) !== 0) {
--      items.push(readDirItemStruct(itemPtr as unknown as number));
+-    if (itemPtr !== null && itemPtr !== 0) {
+-      items.push(readDirItemStruct(itemPtr));
 +    if (itemsBase !== 0n) {
 +      items.push(readDirItemStruct(itemsBase + BigInt(i * DI_SIZE_OF)));
      }
 -    const scorePtr = library.symbols.fff_dir_search_result_get_score(hp, i);
--    if (scorePtr !== null && (scorePtr as unknown as number) !== 0) {
--      scores.push(readScoreStruct(scorePtr as unknown as number));
+-    if (scorePtr !== null && scorePtr !== 0) {
+-      scores.push(readScoreStruct(scorePtr));
 +    if (scoresBase !== 0n) {
 +      scores.push(readScoreStruct(scoresBase + BigInt(i * SC_SIZE_OF)));
      }
    }
- 
-@@ -793,6 +795,8 @@ function parseDirSearchResult(
- // FffMixedSearchResult byte offsets (must match #[repr(C)] layout on 64-bit)
- // { items: *mut, scores: *mut, count: u32, total_matched: u32, total_files: u32, total_dirs: u32, location: FffLocation }
- // ---------------------------------------------------------------------------
-+const MSR_ITEMS = 0; // *mut FffMixedItem (8)
-+const MSR_SCORES = 8; // *mut FffScore    (8)
- const MSR_COUNT = 16; // u32               (4)
- const MSR_MATCHED = 20; // u32               (4)
- const MSR_TOTAL_FILES = 24; // u32               (4)
-@@ -814,11 +818,12 @@ const MI_MODIFIED = 40; // u64         (8)
- const MI_ACCESS = 48; // i64         (8)
- const MI_MODFR = 56; // i64         (8)
- const MI_TOTAL_FR = 64; // i64         (8)
-+const MI_SIZE_OF = 80;
- 
- /**
-  * Read an FffMixedItem struct at the given raw address and return a MixedItem.
-  */
--function readMixedItemStruct(p: number): MixedItem {
-+function readMixedItemStruct(p: bigint): MixedItem {
+   library.symbols.fff_free_dir_search_result(hp);
+   return { ok: true, value: { items, scores, totalMatched, totalDirs } };
+ }
++var MSR_ITEMS = 0;
++var MSR_SCORES = 8;
+ var MSR_COUNT = 16;
+ var MSR_MATCHED = 20;
+ var MSR_TOTAL_FILES = 24;
+@@ -827,6 +832,7 @@ var MI_MODIFIED = 40;
+ var MI_ACCESS = 48;
+ var MI_MODFR = 56;
+ var MI_TOTAL_FR = 64;
++var MI_SIZE_OF = 80;
+ function readMixedItemStruct(p) {
    const pp = asPtr(p);
    const itemType = read.u8(pp, MI_TYPE);
- 
-@@ -827,8 +832,8 @@ function readMixedItemStruct(p: number): MixedItem {
+@@ -834,8 +840,8 @@ function readMixedItemStruct(p) {
      return {
        type: "directory",
        item: {
@@ -247,10 +191,10 @@ index 75fb584..f1b25b5 100644
 -        dirName: readCString(read.ptr(pp, MI_DISPLAY)) ?? "",
 +        relativePath: readCString(read.u64(pp, MI_RELPATH)) ?? "",
 +        dirName: readCString(read.u64(pp, MI_DISPLAY)) ?? "",
-         maxAccessFrecency: Number(read.i64(pp, MI_ACCESS)),
-       },
+         maxAccessFrecency: Number(read.i64(pp, MI_ACCESS))
+       }
      };
-@@ -838,9 +843,9 @@ function readMixedItemStruct(p: number): MixedItem {
+@@ -843,9 +849,9 @@ function readMixedItemStruct(p) {
    return {
      type: "file",
      item: {
@@ -263,73 +207,68 @@ index 75fb584..f1b25b5 100644
        size: Number(read.u64(pp, MI_SIZE)),
        modified: Number(read.u64(pp, MI_MODIFIED)),
        accessFrecencyScore: Number(read.i64(pp, MI_ACCESS)),
-@@ -863,7 +868,7 @@ function parseMixedSearchResult(
+@@ -861,7 +867,7 @@ function parseMixedSearchResult(resultPtr) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
+   if (!("success" in envelope))
+     return envelope;
 -  if (envelope.handlePtr === 0) {
 +  if (envelope.handlePtr === 0n) {
      return err("fff_search_mixed returned null search result");
    }
- 
-@@ -903,14 +908,14 @@ function parseMixedSearchResult(
-   const items: MixedItem[] = [];
-   const scores: Score[] = [];
- 
+   const hp = asPtr(envelope.handlePtr);
+@@ -895,14 +901,14 @@ function parseMixedSearchResult(resultPtr) {
+   const library = loadLibrary();
+   const items = [];
+   const scores = [];
 +  const itemsBase = read.u64(hp, MSR_ITEMS);
 +  const scoresBase = read.u64(hp, MSR_SCORES);
-   for (let i = 0; i < count; i++) {
+   for (let i = 0;i < count; i++) {
 -    const itemPtr = library.symbols.fff_mixed_search_result_get_item(hp, i);
--    if (itemPtr !== null && (itemPtr as unknown as number) !== 0) {
--      items.push(readMixedItemStruct(itemPtr as unknown as number));
+-    if (itemPtr !== null && itemPtr !== 0) {
+-      items.push(readMixedItemStruct(itemPtr));
 +    if (itemsBase !== 0n) {
 +      items.push(readMixedItemStruct(itemsBase + BigInt(i * MI_SIZE_OF)));
      }
 -    const scorePtr = library.symbols.fff_mixed_search_result_get_score(hp, i);
--    if (scorePtr !== null && (scorePtr as unknown as number) !== 0) {
--      scores.push(readScoreStruct(scorePtr as unknown as number));
+-    if (scorePtr !== null && scorePtr !== 0) {
+-      scores.push(readScoreStruct(scorePtr));
 +    if (scoresBase !== 0n) {
 +      scores.push(readScoreStruct(scoresBase + BigInt(i * SC_SIZE_OF)));
      }
    }
- 
-@@ -986,12 +991,12 @@ const MR_SIZE = 8;
- /**
-  * Read a C string array (char**) at the given pointer, with `count` elements.
-  */
--function readCStringArray(base: number, count: number): string[] {
--  if (count === 0 || base === 0) return [];
-+function readCStringArray(base: bigint, count: number): string[] {
-+  if (count === 0 || base === 0n) return [];
-   const result: string[] = [];
+   library.symbols.fff_free_mixed_search_result(hp);
+@@ -953,23 +959,23 @@ var MR_START = 0;
+ var MR_END = 4;
+ var MR_SIZE = 8;
+ function readCStringArray(base, count) {
+-  if (count === 0 || base === 0)
++  if (count === 0 || base === 0n)
+     return [];
+   const result = [];
    const bp = asPtr(base);
-   for (let i = 0; i < count; i++) {
--    const strPtr = read.ptr(bp, i * 8); // each pointer is 8 bytes
-+    const strPtr = read.u64(bp, i * 8); // each pointer is 8 bytes
+   for (let i = 0;i < count; i++) {
+-    const strPtr = read.ptr(bp, i * 8);
++    const strPtr = read.u64(bp, i * 8);
      result.push(readCString(strPtr) ?? "");
    }
    return result;
-@@ -1000,13 +1005,13 @@ function readCStringArray(base: number, count: number): string[] {
- /**
-  * Read an FffGrepMatch struct at the given raw address.
-  */
--function readGrepMatchStruct(p: number): GrepMatch {
-+function readGrepMatchStruct(p: bigint): GrepMatch {
+ }
+ function readGrepMatchStruct(p) {
    const pp = asPtr(p);
 -  const matchRangesPtr = read.ptr(pp, GM_MATCH_RANGES);
 +  const matchRangesPtr = read.u64(pp, GM_MATCH_RANGES);
    const matchRangesCount = read.u32(pp, GM_MR_COUNT);
-   const matchRanges: [number, number][] = [];
-   for (let i = 0; i < matchRangesCount; i++) {
+   const matchRanges = [];
+   for (let i = 0;i < matchRangesCount; i++) {
 -    const base = matchRangesPtr + i * MR_SIZE;
 +    const base = matchRangesPtr + BigInt(i * MR_SIZE);
      const bp = asPtr(base);
      matchRanges.push([read.u32(bp, MR_START), read.u32(bp, MR_END)]);
    }
-@@ -1016,10 +1021,10 @@ function readGrepMatchStruct(p: number): GrepMatch {
+@@ -977,10 +983,10 @@ function readGrepMatchStruct(p) {
+   const ctxBeforeCount = read.u32(pp, GM_CTX_B_COUNT);
    const ctxAfterCount = read.u32(pp, GM_CTX_A_COUNT);
- 
-   const match: GrepMatch = {
+   const match = {
 -    relativePath: readCString(read.ptr(pp, GM_RELPATH)) ?? "",
 -    fileName: readCString(read.ptr(pp, GM_FNAME)) ?? "",
 -    gitStatus: readCString(read.ptr(pp, GM_GIT)) ?? "",
@@ -341,32 +280,29 @@ index 75fb584..f1b25b5 100644
      size: Number(read.u64(pp, GM_SIZE)),
      modified: Number(read.u64(pp, GM_MODIFIED)),
      totalFrecencyScore: Number(read.i64(pp, GM_TOTAL_FR)),
-@@ -1037,13 +1042,13 @@ function readGrepMatchStruct(p: number): GrepMatch {
+@@ -996,10 +1002,10 @@ function readGrepMatchStruct(p) {
+     match.fuzzyScore = read.u16(pp, GM_FUZZY_SCORE);
    }
    if (ctxBeforeCount > 0) {
-     match.contextBefore = readCStringArray(
--      read.ptr(pp, GM_CTX_BEFORE),
-+      read.u64(pp, GM_CTX_BEFORE),
-       ctxBeforeCount,
-     );
+-    match.contextBefore = readCStringArray(read.ptr(pp, GM_CTX_BEFORE), ctxBeforeCount);
++    match.contextBefore = readCStringArray(read.u64(pp, GM_CTX_BEFORE), ctxBeforeCount);
    }
    if (ctxAfterCount > 0) {
-     match.contextAfter = readCStringArray(
--      read.ptr(pp, GM_CTX_AFTER),
-+      read.u64(pp, GM_CTX_AFTER),
-       ctxAfterCount,
-     );
+-    match.contextAfter = readCStringArray(read.ptr(pp, GM_CTX_AFTER), ctxAfterCount);
++    match.contextAfter = readCStringArray(read.u64(pp, GM_CTX_AFTER), ctxAfterCount);
    }
-@@ -1061,7 +1066,7 @@ function parseGrepResult(resultPtr: Pointer | null): Result<GrepResult> {
+   if (read.u8(pp, GM_IS_DEFINITION) !== 0) {
+     match.isDefinition = true;
+@@ -1010,7 +1016,7 @@ function parseGrepResult(resultPtr) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
+   if (!("success" in envelope))
+     return envelope;
 -  if (envelope.handlePtr === 0) {
 +  if (envelope.handlePtr === 0n) {
      return err("grep returned null result");
    }
- 
-@@ -1072,13 +1077,13 @@ function parseGrepResult(resultPtr: Pointer | null): Result<GrepResult> {
+   const hp = asPtr(envelope.handlePtr);
+@@ -1020,12 +1026,12 @@ function parseGrepResult(resultPtr) {
    const totalFiles = read.u32(hp, GR_TOTAL_FILES);
    const filteredFileCount = read.u32(hp, GR_FILTERED);
    const nextFileOffset = read.u32(hp, GR_NEXT_OFFSET);
@@ -375,20 +311,19 @@ index 75fb584..f1b25b5 100644
    const regexFallbackError = readCString(regexErrPtr) ?? undefined;
 -  const itemsBase = read.ptr(hp, GR_ITEMS);
 +  const itemsBase = read.u64(hp, GR_ITEMS);
- 
-   const items: GrepMatch[] = [];
-   for (let i = 0; i < count; i++) {
+   const items = [];
+   for (let i = 0;i < count; i++) {
 -    items.push(readGrepMatchStruct(itemsBase + i * GM_SIZE_OF));
 +    items.push(readGrepMatchStruct(itemsBase + BigInt(i * GM_SIZE_OF)));
    }
- 
    loadLibrary().symbols.fff_free_grep_result(hp);
-@@ -1309,7 +1314,7 @@ export function ffiGetScanProgress(handle: NativeHandle): Result<ScanProgress> {
+   const grepResult = {
+@@ -1095,7 +1101,7 @@ function ffiGetScanProgress(handle) {
    const envelope = readResultEnvelope(resultPtr);
-   if (!("success" in envelope)) return envelope;
- 
+   if (!("success" in envelope))
+     return envelope;
 -  if (envelope.handlePtr === 0) {
 +  if (envelope.handlePtr === 0n) {
      return err("scan progress returned null");
    }
- 
+   const hp = asPtr(envelope.handlePtr);

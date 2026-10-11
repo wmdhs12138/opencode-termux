@@ -218,7 +218,8 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("recut:", self.workflow)
         self.assertNotIn("publish:", self.workflow)
         self.assertNotIn("--clobber", self.workflow)
-        self.assertIn("if: needs.resolve.outputs.unreleased == 'true'", self.workflow)
+        self.assertIn("if: needs.resolve.outputs.unreleased == 'true' && github.ref == 'refs/heads/main'",
+                      self.workflow)
 
     def test_only_the_release_job_can_write(self):
         self.assertEqual(self.workflow.count("contents: write"), 1)

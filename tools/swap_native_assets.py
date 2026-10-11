@@ -29,6 +29,8 @@ ASSETS = [
     ("watcher", "@parcel/watcher-linux-arm64-glibc", "watcher.node"),
     ("fff", "@ff-labs/fff-bin-linux-arm64-gnu", "libfff_c.so"),
     ("rust_pty", "bun-pty", "rust-pty/target/release/librust_pty_arm64.so"),
+    # A static executable OpenCode starts, see scripts/build-opencode-pty.sh.
+    ("opencode_pty", "@opencode-ai/pty-linux-arm64-gnu", "bin/opencode-pty"),
 ]
 # (versions.json key, npm package, patch file under patches/)
 PATCHES = [

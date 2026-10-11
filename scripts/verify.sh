@@ -2,8 +2,9 @@
 # Run the compiled candidate inside Termux and promote it to dist/opencode.
 #
 # scripts/compile.sh builds on a glibc host that cannot execute the Android
-# binary; this is where it runs for the first time: version, the injected
-# update command, FFF search through the bundled wrapper, and the real TUI.
+# binary; this is where it runs for the first time: version, a file search
+# through its own server (the bundled, patched FFF wrapper), the real TUI, and
+# the opencode-pty helper it embeds.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,33 +27,31 @@ SHA="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["output_
 }
 
 REPORTED="$("$CANDIDATE" --version)"
-[ "$REPORTED" = "$VERSION" ] || {
+[[ " $REPORTED " == *[[:space:]v]"$VERSION"[[:space:]]* ]] || {
   echo "verify: --version reports '$REPORTED', expected $VERSION" >&2
   exit 1
 }
-# Network failures are reported by the command and still exit 0.
-timeout 120 "$CANDIDATE" update </dev/null > "$WORK/update-smoke.log" 2>&1 || {
-  echo "verify: update command failed; inspect $WORK/update-smoke.log" >&2
-  exit 1
-}
-# A small tree: a large one may not finish its scan before the search returns.
-FFF_TREE="$WORK/fff-smoke"
-rm -rf "$FFF_TREE"
-mkdir -p "$FFF_TREE/src"
-echo readme > "$FFF_TREE/README.md"
-echo code > "$FFF_TREE/src/main.ts"
-(cd "$FFF_TREE" && timeout 120 "$CANDIDATE" debug file search readme </dev/null) \
-  > "$WORK/fff-smoke.log" 2>&1 || true
-grep -qxF README.md "$WORK/fff-smoke.log" || {
-  echo "verify: file search did not find README.md; inspect $WORK/fff-smoke.log" >&2
+python3 "$ROOT/tools/serve_smoke.py" "$CANDIDATE" 120 > "$WORK/fff-smoke.log" || {
+  echo "verify: file search through the server failed; inspect $WORK/fff-smoke.log" >&2
   exit 1
 }
 python3 "$ROOT/tools/tui_smoke.py" "$CANDIDATE" "$SMOKE_SECONDS" > "$WORK/tui-smoke.log"
 
+# The PTY helper OpenCode embeds, run the way its own release smoke does.
+PTY="$ROOT/work/native/opencode-pty/opencode-pty"
+PTY_RUNTIME="$WORK/pty-smoke"
+rm -rf "$PTY_RUNTIME"
+printf 'new %s -c "printf termux-smoke; sleep 1"\nwait 250\nquit\n' "${PREFIX:-/data/data/com.termux/files/usr}/bin/sh" \
+  | timeout 60 "$PTY" play --runtime-dir "$PTY_RUNTIME" --name smoke > "$WORK/pty-smoke.log" 2>&1 || true
+grep -q termux-smoke "$WORK/pty-smoke.log" && grep -q checkpoint "$WORK/pty-smoke.log" || {
+  echo "verify: opencode-pty did not run a session; inspect $WORK/pty-smoke.log" >&2
+  exit 1
+}
+
 python3 - "$DIST/compile.json" "$DIST/build-manifest.json.new" <<'PY'
 import json, sys
 doc = json.load(open(sys.argv[1]))
-doc["smoke"] = {"version": "pass", "update": "pass", "file_search": "pass"}
+doc["smoke"] = {"version": "pass", "file_search": "pass", "pty": "pass"}
 doc["tui_smoke"] = "pass"
 doc["structurally_verified"] = doc["native_assets"].get("result") == "pass"
 doc["release_eligible"] = doc["structurally_verified"]

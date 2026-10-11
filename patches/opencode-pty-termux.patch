@@ -1,0 +1,26 @@
+diff --git a/src/daemon.rs b/src/daemon.rs
+index 4062ed2..b85f008 100644
+--- a/src/daemon.rs
++++ b/src/daemon.rs
+@@ -349,11 +349,17 @@ mod unix {
+     }
+ 
+     // Sockets stay in /tmp so their paths fit sun_path; temp cleaners skip sockets.
++    // opencode-termux: Android has no /tmp; Termux's is $PREFIX/tmp, whose
++    // socket paths (about 92 bytes) still fit.
+     fn socket_root() -> PathBuf {
+-        PathBuf::from("/tmp").join(format!(
+-            "opencode-pty-{}",
+-            nix::unistd::Uid::effective().as_raw()
+-        ))
++        std::env::var_os("PREFIX")
++            .map(|prefix| PathBuf::from(prefix).join("tmp"))
++            .filter(|tmp| tmp.is_dir())
++            .unwrap_or_else(|| PathBuf::from("/tmp"))
++            .join(format!(
++                "opencode-pty-{}",
++                nix::unistd::Uid::effective().as_raw()
++            ))
+     }
+ 
+     fn socket_file(root: &Path, canonical_directory: &Path) -> PathBuf {

@@ -2,10 +2,10 @@ SHELL := bash
 VERSION ?= latest
 
 # Termux:     fetch-bun, build-native, verify
-# glibc host: fetch-source, fetch-host-bun, fetch-bun, compile
+# glibc host: fetch-source, fetch-host-bun, build-opencode-pty, compile
 # (scripts/compile.sh explains why compiling cannot happen inside Termux.)
 
-.PHONY: fetch-source fetch-bun fetch-host-bun build-watcher build-opentui build-fff build-rust-pty build-native compile verify smoke audit test clean
+.PHONY: fetch-source fetch-bun fetch-host-bun build-watcher build-opentui build-fff build-rust-pty build-native build-opencode-pty compile verify smoke audit test clean
 
 fetch-source:
 	bash scripts/fetch-source.sh $(VERSION)
@@ -30,7 +30,10 @@ build-rust-pty: fetch-bun
 
 build-native: build-watcher build-opentui build-fff build-rust-pty
 
-compile: fetch-host-bun
+build-opencode-pty:
+	bash scripts/build-opencode-pty.sh
+
+compile: fetch-host-bun build-opencode-pty
 	SKIP_RUN=1 bash scripts/fetch-bun.sh
 	bash scripts/compile.sh
 

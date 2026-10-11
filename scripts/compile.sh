@@ -24,7 +24,7 @@ mkdir -p "$WORK" "$DIST"
 
 exec 9>"$ROOT/.build.lock"
 flock -n 9 || { echo "compile: another build is running" >&2; exit 1; }
-[ -f "$SOURCE/packages/opencode/script/build.ts" ] || {
+[ -f "$SOURCE/packages/cli/script/build.ts" ] || {
   echo "compile: OpenCode source is missing: $SOURCE (make fetch-source)" >&2
   exit 1
 }
@@ -69,19 +69,20 @@ python3 "$ROOT/tools/swap_native_assets.py" "$SRC" \
   --watcher "$NATIVE/watcher/watcher.node" \
   --fff "$NATIVE/fff/libfff_c.so" \
   --rust-pty "$NATIVE/bun-pty/librust_pty_arm64.so" \
+  --opencode-pty "$NATIVE/opencode-pty/opencode-pty" \
   --report "$WORK/swap.json"
 echo "::endgroup::"
 
 echo "::group::bun build --compile"
 # --single builds the host's linux-arm64 target; --skip-install keeps the
 # swapped assets (build.ts would otherwise reinstall the platform packages).
-(cd "$SRC/packages/opencode" \
+(cd "$SRC/packages/cli" \
   && OPENCODE_VERSION="$VERSION" OPENCODE_CHANNEL=latest OPENCODE_TERMUX_BUN="$BUN" \
      bun script/build.ts --single --skip-install)
 echo "::endgroup::"
 
 CANDIDATE="$DIST/.opencode.new"
-install -m 755 "$SRC/packages/opencode/dist/opencode-linux-arm64/bin/opencode" "$CANDIDATE"
+install -m 755 "$SRC/packages/cli/dist/cli-linux-arm64/bin/opencode" "$CANDIDATE"
 python3 "$ROOT/tools/extract_graph.py" "$CANDIDATE" "$WORK/opencode.graph" > "$WORK/extract.json"
 python3 "$ROOT/tools/audit_native_assets.py" "$WORK/opencode.graph" \
   --report "$WORK/native-assets.json" --require-bionic >/dev/null || {

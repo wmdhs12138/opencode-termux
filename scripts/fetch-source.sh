@@ -13,12 +13,9 @@ REPO="anomalyco/opencode"
 mkdir -p "$OUT_DIR"
 
 if [ "$VERSION" = latest ]; then
-  API_ARGS=(-fsSL --retry 5 --retry-all-errors)
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    API_ARGS+=(-H "Authorization: Bearer $GITHUB_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28")
-  fi
-  VERSION="$(curl "${API_ARGS[@]}" "https://api.github.com/repos/$REPO/releases/latest" \
-    | python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')"
+  # OpenCode 2 is published to npm only; the GitHub latest release is OpenCode 1.
+  VERSION="$(curl -fsSL --retry 5 --retry-all-errors https://registry.npmjs.org/@opencode%2Fcli \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["dist-tags"]["latest"])')"
 fi
 VERSION="${VERSION#v}"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
@@ -52,8 +49,8 @@ mv -f "$ARCHIVE.new" "$ARCHIVE"
 rm -rf "$SRC" "$SRC.new"
 mkdir -p "$SRC.new"
 tar -xzf "$ARCHIVE" -C "$SRC.new" --strip-components=1
-[ -f "$SRC.new/packages/opencode/script/build.ts" ] || {
-  echo "fetch-source: archive has no packages/opencode/script/build.ts" >&2
+[ -f "$SRC.new/packages/cli/script/build.ts" ] || {
+  echo "fetch-source: archive has no packages/cli/script/build.ts" >&2
   exit 1
 }
 mv "$SRC.new" "$SRC"

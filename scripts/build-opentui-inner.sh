@@ -9,6 +9,8 @@ OUTPUT="$5"
 
 export ANDROID_NDK_HOME="$NDK"
 export OPENCODE_TERMUX_TLS_ALIGN="$TLS_OBJECT"
-cd "$SOURCE/packages/core/src/zig"
-"$ZIG_DIR/zig" build -Dtarget=aarch64-linux-android -Doptimize=ReleaseFast
+cd "$SOURCE/packages/native"
+# Unpacks the Zig dependencies vendored in the source archive; no network.
+sh scripts/prepare-zig-deps.sh
+"$ZIG_DIR/zig" build -Dlibrary-target=aarch64-linux-android -Doptimize=ReleaseFast
 cp -L "lib/aarch64-linux-android/libopentui.so" "$OUTPUT"

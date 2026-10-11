@@ -62,7 +62,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$REQUESTED" = latest ]; then
-            V="$(gh api repos/anomalyco/opencode/releases/latest --jq '.tag_name | ltrimstr("v")')"
+            # OpenCode 2 is published to npm only; its GitHub latest is OpenCode 1.
+            V="$(curl -fsSL --retry 5 --retry-all-errors https://registry.npmjs.org/@opencode%2Fcli \
+                 | python3 -c 'import json, sys; print(json.load(sys.stdin)["dist-tags"]["latest"])')"
           else
             V="${REQUESTED#v}"
           fi
@@ -142,6 +144,14 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pip install setuptools || pip install setuptools || true
+          # opencode-pty is a static musl executable, built as upstream does.
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+          command -v rustup >/dev/null || {
+            curl --proto "=https" --tlsv1.2 -fsSL https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          }
           make fetch-source VERSION="$OPENCODE_VERSION"
           make compile
           rm -rf work/build/src
@@ -186,7 +196,9 @@ jobs:
 
   release:
     needs: [resolve, bionic]
-    if: needs.resolve.outputs.unreleased == 'true'
+    # Only main publishes: a branch can be dispatched for any version to test
+    # the whole build, acceptance included, without releasing it.
+    if: needs.resolve.outputs.unreleased == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

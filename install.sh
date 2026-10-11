@@ -1,7 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Install or update OpenCode for Termux from this project's Bionic-verified
-# releases. `opencode upgrade` downloads this script from main and runs it with
-# VERSION set, so its interface (VERSION, PREFIX, OPENCODE_TERMUX_REPO) must
+# releases. `opencode upgrade` downloads this script from main and runs it:
+# OpenCode 1 with VERSION set, OpenCode 2 with `--version X.Y.Z
+# --no-modify-path`. Both interfaces (and PREFIX, OPENCODE_TERMUX_REPO) must
 # keep working for every installed binary.
 #
 #   VERSION=latest     the latest release
@@ -24,6 +25,15 @@ die() {
   printf 'opencode-termux: %s\n' "$*" >&2
   exit 1
 }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --version) [ $# -ge 2 ] || die "--version needs a value"; REQUESTED_VERSION="$2"; shift 2 ;;
+    --version=*) REQUESTED_VERSION="${1#--version=}"; shift ;;
+    --no-modify-path) shift ;;  # it installs into $PREFIX/bin, which is on PATH
+    *) die "unknown option: $1" ;;
+  esac
+done
 
 [ "$(uname -m)" = "aarch64" ] || die "only Android AArch64 is supported"
 [ -d "$PREFIX_PATH/bin" ] || die "run this installer inside Termux"
