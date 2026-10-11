@@ -1,5 +1,5 @@
 diff --git a/packages/native/build.zig b/packages/native/build.zig
-index b226da7..43ec060 100644
+index b226da7..21aa1ad 100644
 --- a/packages/native/build.zig
 +++ b/packages/native/build.zig
 @@ -367,7 +367,8 @@ fn addNativeAudioDependencies(
@@ -18,13 +18,13 @@ index b226da7..43ec060 100644
      module.addImport("yoga", yoga_translate.createModule());
 +
 +    if (target.result.abi == .android) {
-+        addAndroidIncludes(b, miniaudio_translate);
-+        addAndroidIncludes(b, yoga_translate);
++        addAndroidIncludes(b, miniaudio_translate, target);
++        addAndroidIncludes(b, yoga_translate, target);
 +    }
  }
  
  /// Apply dependencies to a module
-@@ -711,6 +717,39 @@ fn buildSingleTarget(
+@@ -711,6 +717,44 @@ fn buildSingleTarget(
      try buildTarget(b, target_str, target_str, description, optimize, build_options, macos_sdk_path);
  }
  
@@ -34,10 +34,15 @@ index b226da7..43ec060 100644
 +    return b.pathJoin(&.{ ndk, "toolchains", "llvm", "prebuilt", "linux-x86_64", "sysroot", "usr" });
 +}
 +
-+fn addAndroidIncludes(b: *std.Build, translate: *std.Build.Step.TranslateC) void {
++fn addAndroidIncludes(b: *std.Build, translate: *std.Build.Step.TranslateC, target: std.Build.ResolvedTarget) void {
 +    const include = b.pathJoin(&.{ androidSysroot(b), "include" });
 +    translate.addSystemIncludePath(.{ .cwd_relative = include });
 +    translate.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ include, "aarch64-linux-android" }) });
++    // Zig's C frontend neither derives the API level from the target, as clang
++    // does, nor accepts the nullability the NDK puts on array parameters.
++    translate.defineCMacro("__ANDROID_MIN_SDK_VERSION__", b.fmt("{d}", .{target.result.os.version_range.linux.android}));
++    translate.defineCMacro("_Nullable", "");
++    translate.defineCMacro("_Nonnull", "");
 +}
 +
 +// opencode-termux: link against the NDK sysroot and raise PT_TLS alignment to
@@ -64,7 +69,7 @@ index b226da7..43ec060 100644
  fn buildTarget(
      b: *std.Build,
      zig_target: []const u8,
-@@ -746,6 +785,7 @@ fn buildTarget(
+@@ -746,6 +790,7 @@ fn buildTarget(
      });
  
      if (target.result.os.tag == .linux and optimize != .Debug) lib.build_id = .sha1;
