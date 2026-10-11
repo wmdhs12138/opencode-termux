@@ -189,6 +189,20 @@ jobs:
             bash .github/ci/bionic-build.sh verify "$TERMUX_DOCKER_IMAGE"
           sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
 
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diagnostics
+          path: |
+            work/build/*.log
+            work/build/*.json
+            work/native/*/*.json
+            work/native/opentui/libopentui.so
+            dist/compile.json
+          retention-days: 3
+          if-no-files-found: ignore
+
       - name: Verify Bionic build manifest
         run: |
           set -euo pipefail
