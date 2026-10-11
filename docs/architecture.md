@@ -32,7 +32,7 @@ Bun 照常执行这些已经写死的分支。
 | 补丁 | 改什么 |
 | --- | --- |
 | `opencode-0001-compile-on-android-bun` | `build.ts` 从 `OPENCODE_TERMUX_BUN` 取被嵌入的 Bun；主机跑不了 Android 产物，跳过主机上的 `--version` 冒烟 |
-| `opencode-0002-update-from-termux-releases` | `$PREFIX/bin` 识别为 curl 安装；最新版和安装脚本改为本项目的 Release；新增只读的 `update`；`update` 和 `upgrade` 按二进制哈希判断（`src/installation/termux.ts`） |
+| `opencode-0002-update-from-termux-releases` | `$PREFIX/bin` 识别为 curl 安装；最新版和安装脚本改为本项目的 Release；新增只读的 `update`；`update` 和 `upgrade` 按二进制哈希判断（`src/installation/termux.ts`）；关掉 1.19 起的 OpenCode 2 升级（`upgrade --major`、TUI `/update` 和首页提示），它们都会装官方 glibc 版 |
 | `fff-bun-android` | FFF 的 Bun wrapper 用 `read.u64` 读指针并以 bigint 运算：Android AArch64 的堆指针高字节带 tag，JavaScript number 存不下 |
 | `opentui-android`、`bun-pty-android` | 原生组件本身的 Android 构建，见 [native-assets.md](native-assets.md) |
 

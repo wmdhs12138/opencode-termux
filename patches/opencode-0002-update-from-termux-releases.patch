@@ -37,7 +37,7 @@ index 0000000..94ffa6a
 +  },
 +}
 diff --git a/packages/opencode/src/cli/cmd/upgrade.ts b/packages/opencode/src/cli/cmd/upgrade.ts
-index 3c1604a..abdf2b1 100644
+index e64529e..0392ac4 100644
 --- a/packages/opencode/src/cli/cmd/upgrade.ts
 +++ b/packages/opencode/src/cli/cmd/upgrade.ts
 @@ -3,6 +3,7 @@ import { UI } from "../ui"
@@ -48,16 +48,51 @@ index 3c1604a..abdf2b1 100644
  
  export const UpgradeCommand = {
    command: "upgrade [target]",
-@@ -45,7 +46,8 @@ export const UpgradeCommand = {
+@@ -48,6 +49,12 @@ export const UpgradeCommand = {
+     }
      prompts.log.info("Using method: " + method)
+ 
++    if (args.major) {
++      prompts.log.error(TermuxBuild.NO_OPENCODE_2)
++      prompts.outro("Done")
++      return
++    }
++
+     if (args.major) {
+       prompts.log.info(`From ${InstallationVersion} → OpenCode 2`)
+       const spinner = prompts.spinner()
+@@ -67,9 +74,9 @@ export const UpgradeCommand = {
+ 
      const target = args.target ? args.target.replace(/^v/, "") : await Installation.latest()
  
 -    if (InstallationVersion === target) {
 +    // opencode-termux: the installed version may still be an older build of it.
 +    if (InstallationVersion === target && (await TermuxBuild.sameBuild(target))) {
        prompts.log.warn(`opencode upgrade skipped: ${target} is already installed`)
+-      prompts.log.info("OpenCode 2 is available. Upgrade with `opencode upgrade --major`")
        prompts.outro("Done")
        return
+     }
+@@ -92,7 +99,6 @@ export const UpgradeCommand = {
+       return
+     }
+     spinner.stop("Upgrade complete")
+-    prompts.log.info("OpenCode 2 is available. Upgrade with `opencode upgrade --major`")
+     prompts.outro("Done")
+   },
+ }
+diff --git a/packages/opencode/src/cli/upgrade.ts b/packages/opencode/src/cli/upgrade.ts
+index de009f7..d19e561 100644
+--- a/packages/opencode/src/cli/upgrade.ts
++++ b/packages/opencode/src/cli/upgrade.ts
+@@ -33,5 +33,6 @@ export async function upgrade() {
+     })
+   )
+     return { type: "available" as const, version: latest }
+-  return { type: "major" as const }
++  // opencode-termux: no OpenCode 2 suggestion, see installation/termux.ts.
++  return
+ }
 diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
 index 13540a7..876f22c 100644
 --- a/packages/opencode/src/index.ts
@@ -79,7 +114,7 @@ index 13540a7..876f22c 100644
    .command(UninstallCommand)
    .command(ServeCommand)
 diff --git a/packages/opencode/src/installation/index.ts b/packages/opencode/src/installation/index.ts
-index 4300220..2fc8327 100644
+index b91a031..12b5ce0 100644
 --- a/packages/opencode/src/installation/index.ts
 +++ b/packages/opencode/src/installation/index.ts
 @@ -14,6 +14,7 @@ import semver from "semver"
@@ -90,7 +125,7 @@ index 4300220..2fc8327 100644
  
  export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
  
-@@ -144,7 +145,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+@@ -172,7 +173,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
  
      const upgradeCurl = Effect.fnUntraced(
        function* (target: string) {
@@ -99,7 +134,7 @@ index 4300220..2fc8327 100644
          const body = yield* response.text
          const bodyBytes = new TextEncoder().encode(body)
          const shell = yield* upgradeScriptShell()
-@@ -172,6 +173,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+@@ -234,6 +235,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
          }
        }),
        method: Effect.fn("Installation.method")(function* () {
@@ -107,7 +142,7 @@ index 4300220..2fc8327 100644
          if (process.execPath.includes(path.join(".opencode", "bin"))) return "curl" as Method
          if (process.execPath.includes(path.join(".local", "bin"))) return "curl" as Method
          const exec = process.execPath.toLowerCase()
-@@ -255,7 +257,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+@@ -317,7 +319,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
          }
  
          const response = yield* httpOk.execute(
@@ -116,12 +151,21 @@ index 4300220..2fc8327 100644
              HttpClientRequest.acceptJson,
            ),
          )
+@@ -382,6 +384,8 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+         yield* text([process.execPath, "--version"])
+       }),
+       upgradeMajor: Effect.fn("Installation.upgradeMajor")(function* (m: Method) {
++        // opencode-termux: covers `opencode upgrade --major` and the TUI's /update.
++        return yield* new UpgradeFailedError({ stderr: TermuxBuild.NO_OPENCODE_2 })
+         const outcome = yield* majorUpgrade(m)
+         if (outcome.code !== 0) return yield* new UpgradeFailedError({ stderr: upgradeFailure(m, outcome) })
+         yield* Effect.logInfo("upgraded major", { method: m, stdout: outcome.stdout, stderr: outcome.stderr })
 diff --git a/packages/opencode/src/installation/termux.ts b/packages/opencode/src/installation/termux.ts
 new file mode 100644
-index 0000000..8221e42
+index 0000000..6acef10
 --- /dev/null
 +++ b/packages/opencode/src/installation/termux.ts
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,55 @@
 +// opencode-termux: this build updates from the Bionic-verified releases of
 +// wmdhs12138/opencode-termux, never from the official glibc packages.
 +//
@@ -135,6 +179,8 @@ index 0000000..8221e42
 +export const RELEASE_MANIFEST =
 +  "https://github.com/wmdhs12138/opencode-termux/releases/latest/download/build-manifest.json"
 +export const INSTALLER = "https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh"
++// OpenCode 2 has no Termux build: every route upstream offers installs an official glibc binary.
++export const NO_OPENCODE_2 = "OpenCode 2 is not available for Termux yet; `opencode upgrade` keeps OpenCode 1 up to date."
 +
 +/** The Termux prefix the installer writes to; `opencode` installed there updates with it. */
 +export function installedByInstaller(execPath = process.execPath) {

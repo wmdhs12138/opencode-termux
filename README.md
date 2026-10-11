@@ -36,6 +36,8 @@ opencode upgrade  # 下载并安装新版本
 
 两个命令均使用本项目经过 Bionic CI 验证的 Release，不会下载官方 glibc 版本。重复运行安装命令也可以完成更新。
 
+OpenCode 2 还没有 Termux 版本：`opencode upgrade --major` 和 TUI 里的 OpenCode 2 升级在本构建中不可用（上游的升级会安装官方 glibc 版，在 Termux 上无法运行）。
+
 同一 OpenCode 版本因构建工具链更新（例如 Bun 底座）重新发布时，tag 是 `vX.Y.Z-rN`。`update` 和 `upgrade` 按二进制哈希判断，
 能识别这种重新发布；v1.18.35 及更早版本自带的 `upgrade` 只比较版本号，需要重新运行一次安装命令。
 
