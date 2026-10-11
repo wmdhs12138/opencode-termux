@@ -71,6 +71,7 @@ class InstallTests(unittest.TestCase):
             "curl": FAKE_CURL,
             "uname": f"#!{BASH}\necho aarch64\n",
             "getprop": f"#!{BASH}\necho 34\n",
+            "rg": f"#!{BASH}\nexit 0\n",
         }.items():
             (fake / name).write_text(body)
             (fake / name).chmod(0o755)

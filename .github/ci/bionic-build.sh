@@ -73,7 +73,8 @@ natives() {
 verify() {
   # A fresh container: nothing from the natives phase is installed.
   pkg update -y
-  pkg install -y coreutils make python zip
+  # ripgrep, as install.sh installs it for users.
+  pkg install -y coreutils make python ripgrep zip
   make verify
 
   VERSION="$(python3 -c 'import json; print(json.load(open("dist/build-manifest.json"))["opencode"])')"

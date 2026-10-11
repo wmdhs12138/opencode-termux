@@ -1,0 +1,16 @@
+diff --git a/packages/core/src/ripgrep/binary.ts b/packages/core/src/ripgrep/binary.ts
+index 4ca73e8..558a0b6 100644
+--- a/packages/core/src/ripgrep/binary.ts
++++ b/packages/core/src/ripgrep/binary.ts
+@@ -101,6 +101,11 @@ export namespace RipgrepBinary {
+             const target = path.join(global.bin, `rg${process.platform === "win32" ? ".exe" : ""}`)
+             if (yield* fs.isFile(target).pipe(Effect.orDie)) return target
+ 
++            // opencode-termux: ripgrep's release builds need glibc, which Android
++            // does not have. install.sh installs Termux's own.
++            if (process.env.PREFIX?.startsWith("/data/data/"))
++              throw new Error("ripgrep is not installed; install it with: pkg install ripgrep")
++
+             const platformKey = `${process.arch}-${process.platform}` as keyof typeof PLATFORM
+             const config = PLATFORM[platformKey]
+             if (!config) throw new Error(`unsupported platform for ripgrep: ${platformKey}`)

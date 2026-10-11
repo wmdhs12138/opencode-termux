@@ -38,6 +38,12 @@ done
 [ "$(uname -m)" = "aarch64" ] || die "only Android AArch64 is supported"
 [ -d "$PREFIX_PATH/bin" ] || die "run this installer inside Termux"
 command -v curl >/dev/null || die "curl is required (pkg install curl)"
+# OpenCode searches files with ripgrep and would otherwise download the
+# official build, which needs glibc. Termux packages a native one.
+command -v rg >/dev/null || {
+  printf 'Installing the ripgrep dependency...\n'
+  pkg install -y ripgrep
+}
 
 api_level="$(getprop ro.build.version.sdk 2>/dev/null || true)"
 if [[ "$api_level" =~ ^[0-9]+$ ]] && [ "$api_level" -lt 28 ]; then

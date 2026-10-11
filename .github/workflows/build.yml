@@ -203,6 +203,7 @@ jobs:
             dist/.opencode.new
           retention-days: 3
           if-no-files-found: ignore
+          include-hidden-files: true  # dist/.opencode.new
 
       - name: Verify Bionic build manifest
         run: |
