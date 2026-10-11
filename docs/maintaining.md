@@ -1,6 +1,6 @@
 # 维护手册
 
-给维护者（包括以后的自己）。发布都在 CI 里完成；手机上做的是改补丁和工具、跑测试，以及用现成的原生组件做本地构建验证。
+给维护者（包括以后的自己）。构建和验收都在 CI 里完成；手机上做的是改补丁和工具、跑测试，最多帮着验证一下单个组件。
 
 ```bash
 make test                        # 回归测试，几秒，不联网
@@ -12,36 +12,34 @@ make test                        # 回归测试，几秒，不联网
 
 | 失败在 | 通常意味着 | 怎么办 |
 | --- | --- | --- |
-| `updater ... match mismatch` | 上游改了升级命令或安装服务的写法 | 在模块图里找到新写法，更新 `tools/patch_updater_graph.py` 的正则，在 `tests/test_updater_patch.py` 加一个该版本的样例 |
-| 原生组件审计 | 图里出现了新的原生模块，或某个组件的名字变了 | 看 `work/build/native-after.json`，见 [native-assets.md](native-assets.md) |
-| `update command smoke failed` | 注入的 `update` 命令在运行时出错，多半是捕获的压缩名不在作用域里 | 看 `work/build/update-smoke.log` |
-| 嫁接或 `--version` 段错误 | 模块图格式随 Bun 版本变了 | 需要更新的 Bun 底座，见下文 |
+| `opencode-000N-*.patch does not apply` | 上游改了补丁涉及的代码 | 在新 tag 的源码上重做这个补丁（见下文），补丁一律 fuzz 0 |
+| `swap_native_assets: ... pins X, installed: Y` | 上游升级了某个原生依赖 | 在 `versions.json` 把组件升到 Y，确认 `patches/` 里对应的补丁还适用，CI 会从源码重新编译组件 |
+| `fff-bun-android.patch does not apply` | FFF 的 Bun wrapper 变了 | 重做补丁；手机上可以用 Release 里的 `libfff_c.so` 直接测 wrapper |
+| `a native asset in the binary is not Bionic` | 产物里出现了新的原生模块 | 看 `work/build/native-assets.json`，见 [native-assets.md](native-assets.md) |
+| `host Bun ... cannot compile for Android Bun ...` | `versions.json` 的 `host_bun` 和 `base_bun` 版本不同 | 两者总是一起改 |
+| verify 里的 `update` / 文件搜索 / TUI 冒烟 | 运行时问题 | 看 `work/build/*-smoke.log`（CI 的日志里有输出） |
 
-手动重跑：`gh workflow run build.yml -f version=<版本>`。
+手动重跑：`gh workflow run build.yml -f version=<版本>`。要在分支上验证而不发布，用一个已经发布过的版本、`recut=false`（见 [ci.md](ci.md)）。
 
-## 在手机上本地构建
-
-原生组件要用 NDK、Rust 和 Zig 编译，手机上一般没有。验证 Bun 底座或图补丁时，可以直接复用某个 Release 里已经验收过的组件：
+## 重做 OpenCode 补丁
 
 ```bash
-make fetch VERSION=1.18.35                      # 官方 linux-arm64，按 GitHub 的 digest 校验
-make fetch-bun                                  # versions.json 锁定的 Bun 底座
-mkdir -p "$TMPDIR/oc/bin"                      # 只为取组件，不碰 $PREFIX/bin
-curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh \
-  | PREFIX="$TMPDIR/oc" VERSION=1.18.35 bash
-python3 tools/dump_native_assets.py "$TMPDIR/oc/bin/opencode" work/native-release > work/native-release.env
-env $(cat work/native-release.env) REQUIRE_ALL_BIONIC=1 bash scripts/build.sh
+make fetch-source VERSION=<新版本>          # work/upstream/opencode-src，不联网编译
+cd work/upstream/opencode-src && git init -q && git add -A && git commit -qm upstream
+patch -p1 --merge < ../../../patches/opencode-0002-update-from-termux-releases.patch
+# 解决冲突后
+git add -A && git diff --cached > ../../../patches/opencode-0002-update-from-termux-releases.patch
 ```
 
-`scripts/build.sh` 会做完整的检查：原生组件审计、嫁接校验、`--version`、`update` 命令冒烟和真实 TUI 冒烟，全部通过才替换 `dist/opencode`。组件本身的 FFF / watcher / PTY 冒烟用的是 `work/bun-android/bun`，可以对取出来的文件单独运行（见 `scripts/build-*.sh` 末尾）。
+改完的 TypeScript 可以用 `work/bun-android/bun build --no-bundle <文件>` 检查语法；`src/installation/termux.ts` 这种不依赖上游模块的文件可以直接用 Android Bun 运行。
 
 ## 更换 Bun 底座
 
 底座是 Bun 官方 Release 里的 `bun-linux-aarch64-android.zip`，`versions.json` 按 URL 和 SHA-256 锁定（`archive_sha256` 对照 Release 的 `SHASUMS256.txt`）。改完 `versions.json` 后：
 
-1. `make fetch-bun`，确认下载和两个哈希都对得上；
-2. 按上一节在手机上本地构建，并对取出来的组件跑一遍三个冒烟；
-3. 推送，让 CI 从源码重新编译组件并在 termux-docker 里验收；
+1. 同时更新 `host_bun`：同一个 Bun Release 的 `bun-linux-aarch64.zip`，编译用的 Bun 必须和底座同版本；
+2. `make fetch-bun`，确认下载和两个哈希都对得上（`host_bun` 只能在 glibc 主机上 `make fetch-host-bun`）；
+3. 推送，让 CI 重新编译并在 termux-docker 里验收；
 4. 通过后用 `recut` 重新发布当前版本（见下文）。
 
 原生组件编译时不依赖 Bun，Bun 只用来跑它们的冒烟测试，所以换底座不需要改组件。
@@ -72,8 +70,10 @@ v1.18.35 及更早的二进制自带的 `upgrade` 只比较版本，会跳过同
 
 ## 踩过的坑
 
-- **嫁接时底座文件的尾巴会落进 `.bss`。** 扩展可写段的 `p_filesz` 后，底座原本放在段尾之后的 `.symtab`、节头表会成为 `.bss` 的初值。官方 Bun 1.4.3 上任何图都会在启动时于 `0x0` 段错误；`tools/revive_patch.py` 已修复（也提交给了上游 Hope2333/opencode-termux#34）。
+- **Android 版 Bun 不能用来编译 OpenCode。** `bun build --compile` 把 `process.platform` 写死成编译用 Bun 的平台，Android 版写的是 `android`，原生包都按 `linux` 选，产物启动时找不到 OpenTUI。所以编译放在 glibc 主机上，用 `compile.executablePath` 嵌进 Android Bun。
+- **Bun 把 `node_modules` 硬链接到全局缓存。** 原地改文件会改坏缓存，之后别的项目装到的也是改过的版本；`swap_native_assets.py` 都是删掉再写新文件。Android 上没有硬链接（Termux 的 Python 甚至没有 `os.link`），相关测试在 Termux 里跳过。
+- **FFF 在 Android 上崩溃。** 堆指针高字节带 tag，`read.ptr()` 返回的 number 丢了这些位。用 Release 里的 `libfff_c.so` 和未打补丁的 wrapper 就能在手机上复现。
 - **termux-docker 里没有 `/usr/bin/env`。** `make test` 也会在 Bionic 容器里跑，测试造的假命令要用 `sys.executable` 或 `shutil.which("bash")` 的绝对路径做解释器。
 - **api.github.com 匿名每小时 60 次。** 手机常在运营商 NAT 后面，很快用完；安装器和更新检查都只用 Release 页面的跳转和 Release 附件，它们不受这个限制。
-- **压缩名每个版本都变。** 补丁一律从上游自己的调用里捕获名字（见 `patch_updater_graph.py` 的说明），不要写死。
+- **大目录里 `opencode debug file search` 可能返回空。** 扫描还没完成搜索就返回了，所以验收用一个只有两个文件的小目录。
 - Android 上 `/tmp` 不可写，临时文件放 `$TMPDIR`。

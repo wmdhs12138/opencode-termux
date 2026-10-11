@@ -1,0 +1,177 @@
+diff --git a/packages/opencode/src/cli/cmd/update.ts b/packages/opencode/src/cli/cmd/update.ts
+new file mode 100644
+index 0000000..94ffa6a
+--- /dev/null
++++ b/packages/opencode/src/cli/cmd/update.ts
+@@ -0,0 +1,32 @@
++import { UI } from "../ui"
++import * as prompts from "@clack/prompts"
++import { InstallationVersion } from "@opencode-ai/core/installation/version"
++import { TermuxBuild } from "../../installation/termux"
++
++// opencode-termux: a read-only check; `opencode upgrade` installs.
++export const UpdateCommand = {
++  command: "update",
++  describe: "check for opencode updates",
++  handler: async () => {
++    UI.empty()
++    UI.println(UI.logo("  "))
++    UI.empty()
++    prompts.intro("Update")
++    const latest = await TermuxBuild.check().catch((err) => (err instanceof Error ? err : new Error(String(err))))
++    if (latest instanceof Error) {
++      prompts.log.error(`Update check failed: ${latest.message}`)
++      prompts.outro("Done")
++      return
++    }
++    prompts.log.info(`Current: ${InstallationVersion} (build ${latest.current.slice(0, 12)})`)
++    prompts.log.info(`Latest: ${latest.version} (build ${latest.build.slice(0, 12)})`)
++    if (InstallationVersion !== latest.version) {
++      prompts.log.warn(`Update available: ${latest.version}. Run opencode upgrade to install it.`)
++    } else if (latest.build && latest.build !== latest.current) {
++      prompts.log.warn(`A rebuilt OpenCode ${latest.version} is available. Run opencode upgrade to install it.`)
++    } else {
++      prompts.log.info("OpenCode is up to date")
++    }
++    prompts.outro("Done")
++  },
++}
+diff --git a/packages/opencode/src/cli/cmd/upgrade.ts b/packages/opencode/src/cli/cmd/upgrade.ts
+index 3c1604a..abdf2b1 100644
+--- a/packages/opencode/src/cli/cmd/upgrade.ts
++++ b/packages/opencode/src/cli/cmd/upgrade.ts
+@@ -3,6 +3,7 @@ import { UI } from "../ui"
+ import * as prompts from "@clack/prompts"
+ import { Installation } from "../../installation"
+ import { InstallationVersion } from "@opencode-ai/core/installation/version"
++import { TermuxBuild } from "../../installation/termux"
+ 
+ export const UpgradeCommand = {
+   command: "upgrade [target]",
+@@ -45,7 +46,8 @@ export const UpgradeCommand = {
+     prompts.log.info("Using method: " + method)
+     const target = args.target ? args.target.replace(/^v/, "") : await Installation.latest()
+ 
+-    if (InstallationVersion === target) {
++    // opencode-termux: the installed version may still be an older build of it.
++    if (InstallationVersion === target && (await TermuxBuild.sameBuild(target))) {
+       prompts.log.warn(`opencode upgrade skipped: ${target} is already installed`)
+       prompts.outro("Done")
+       return
+diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
+index 13540a7..876f22c 100644
+--- a/packages/opencode/src/index.ts
++++ b/packages/opencode/src/index.ts
+@@ -6,6 +6,7 @@ import { ConsoleCommand } from "./cli/cmd/account"
+ import { ProvidersCommand } from "./cli/cmd/providers"
+ import { AgentCommand } from "./cli/cmd/agent"
+ import { UpgradeCommand } from "./cli/cmd/upgrade"
++import { UpdateCommand } from "./cli/cmd/update"
+ import { UninstallCommand } from "./cli/cmd/uninstall"
+ import { ModelsCommand } from "./cli/cmd/models"
+ import { UI } from "./cli/ui"
+@@ -88,6 +89,7 @@ const cli = yargs(args)
+   .command(ConsoleCommand)
+   .command(ProvidersCommand)
+   .command(AgentCommand)
++  .command(UpdateCommand)
+   .command(UpgradeCommand)
+   .command(UninstallCommand)
+   .command(ServeCommand)
+diff --git a/packages/opencode/src/installation/index.ts b/packages/opencode/src/installation/index.ts
+index 4300220..2fc8327 100644
+--- a/packages/opencode/src/installation/index.ts
++++ b/packages/opencode/src/installation/index.ts
+@@ -14,6 +14,7 @@ import semver from "semver"
+ import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
+ import { NpmConfig } from "@opencode-ai/core/npm-config"
+ import { InstallationEvent } from "@opencode-ai/schema/installation-event"
++import { TermuxBuild } from "./termux"
+ 
+ export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
+ 
+@@ -144,7 +145,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+ 
+     const upgradeCurl = Effect.fnUntraced(
+       function* (target: string) {
+-        const response = yield* httpOk.execute(HttpClientRequest.get("https://opencode.ai/install"))
++        const response = yield* httpOk.execute(HttpClientRequest.get(TermuxBuild.INSTALLER))
+         const body = yield* response.text
+         const bodyBytes = new TextEncoder().encode(body)
+         const shell = yield* upgradeScriptShell()
+@@ -172,6 +173,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+         }
+       }),
+       method: Effect.fn("Installation.method")(function* () {
++        if (TermuxBuild.installedByInstaller()) return "curl" as Method
+         if (process.execPath.includes(path.join(".opencode", "bin"))) return "curl" as Method
+         if (process.execPath.includes(path.join(".local", "bin"))) return "curl" as Method
+         const exec = process.execPath.toLowerCase()
+@@ -255,7 +257,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
+         }
+ 
+         const response = yield* httpOk.execute(
+-          HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
++          HttpClientRequest.get(TermuxBuild.RELEASE_MANIFEST).pipe(
+             HttpClientRequest.acceptJson,
+           ),
+         )
+diff --git a/packages/opencode/src/installation/termux.ts b/packages/opencode/src/installation/termux.ts
+new file mode 100644
+index 0000000..8221e42
+--- /dev/null
++++ b/packages/opencode/src/installation/termux.ts
+@@ -0,0 +1,53 @@
++// opencode-termux: this build updates from the Bionic-verified releases of
++// wmdhs12138/opencode-termux, never from the official glibc packages.
++//
++// A release is vX.Y.Z or a re-cut vX.Y.Z-rN of the same OpenCode version (new
++// toolchain, same upstream code), so the version alone cannot tell two builds
++// apart. The explicit commands compare the running binary's SHA-256 with the
++// latest release's build-manifest.json instead. `Installation.latest()`, and
++// the TUI's background update check behind it, keeps comparing versions, so a
++// re-cut is offered but never reinstalled in the background.
++
++export const RELEASE_MANIFEST =
++  "https://github.com/wmdhs12138/opencode-termux/releases/latest/download/build-manifest.json"
++export const INSTALLER = "https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh"
++
++/** The Termux prefix the installer writes to; `opencode` installed there updates with it. */
++export function installedByInstaller(execPath = process.execPath) {
++  return execPath.startsWith((process.env.PREFIX ?? "/data/data/com.termux/files/usr") + "/bin/")
++}
++
++export type Build = {
++  /** Latest release's OpenCode version, without v */
++  version: string
++  /** Latest release's binary SHA-256 */
++  build: string
++  /** Running binary's SHA-256 */
++  current: string
++}
++
++/** Reads the latest release's manifest and hashes the running binary (about a second for ~200 MB). */
++export async function check(): Promise<Build> {
++  const response = await fetch(RELEASE_MANIFEST)
++  if (!response.ok) throw new Error(`HTTP ${response.status} from the release manifest`)
++  const manifest = (await response.json()) as { tag_name?: unknown; output_sha256?: unknown }
++  const hasher = new Bun.CryptoHasher("sha256")
++  for await (const chunk of Bun.file(process.execPath).stream()) hasher.update(chunk)
++  return {
++    version: String(manifest.tag_name ?? "").replace(/^v/, ""),
++    build: String(manifest.output_sha256 ?? ""),
++    current: hasher.digest("hex"),
++  }
++}
++
++/** Whether `version` is installed as the latest release's build. True when that cannot be told. */
++export async function sameBuild(version: string) {
++  try {
++    const latest = await check()
++    return latest.version !== version || !latest.build || latest.build === latest.current
++  } catch {
++    return true
++  }
++}
++
++export * as TermuxBuild from "./termux"

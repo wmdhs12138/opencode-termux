@@ -1,0 +1,31 @@
+diff --git a/packages/opencode/script/build.ts b/packages/opencode/script/build.ts
+index b713911..3ff5929 100755
+--- a/packages/opencode/script/build.ts
++++ b/packages/opencode/script/build.ts
+@@ -22,6 +22,9 @@ const skipInstall = process.argv.includes("--skip-install")
+ const sourcemapsFlag = process.argv.includes("--sourcemaps")
+ const plugin = createSolidTransformPlugin()
+ const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
++// opencode-termux: the Android Bun to embed into instead of the target's own
++// Bun. The host stays glibc Linux, so the bundle is resolved for linux-arm64.
++const termuxBun = process.env.OPENCODE_TERMUX_BUN
+ 
+ const createEmbeddedWebUIBundle = async () => {
+   console.log(`Building Web UI to embed in the binary`)
+@@ -175,6 +178,7 @@ for (const item of targets) {
+       autoloadTsconfig: true,
+       autoloadPackageJson: true,
+       target: name.replace(pkg.name, "bun") as any,
++      ...(termuxBun ? { executablePath: termuxBun } : {}),
+       outfile: `dist/${name}/bin/opencode`,
+       execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
+       windows: {},
+@@ -208,7 +212,7 @@ for (const item of targets) {
+   }
+ 
+   // Smoke test: only run if binary is for current platform
+-  if (item.os === process.platform && item.arch === process.arch && !item.abi) {
++  if (item.os === process.platform && item.arch === process.arch && !item.abi && !termuxBun) {
+     const binaryPath = `dist/${name}/bin/opencode`
+     console.log(`Running smoke test: ${binaryPath} --version`)
+     try {

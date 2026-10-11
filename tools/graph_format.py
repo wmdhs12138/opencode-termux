@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read and safely extend Bun >= 1.4 standalone module graphs.
+"""Read Bun >= 1.4 standalone module graphs.
 
 The graph payload does not include the leading u64 length stored in an ELF.
 Pointers in module records are relative to the beginning of this payload.
@@ -14,7 +14,6 @@ import struct
 TRAILER = b"\n---- Bun! ----\n"
 OFFSETS_SIZE = 32
 STRIDE = 52
-POINTER_FIELDS = (0, 8, 16, 24, 32, 40)
 
 
 class GraphError(ValueError):
@@ -103,53 +102,3 @@ class Graph:
     def modules(self):
         for index in range(self.module_count):
             yield self.module(index)
-
-    def replace_contents_by_append(self, index: int, replacement: bytes) -> dict:
-        """Point one module at replacement bytes appended before Offsets.
-
-        Existing data never moves, so every pre-existing StringPointer remains
-        valid. This deliberately leaves the old asset unreachable in the graph;
-        avoiding an in-place size limit is worth the small output-size increase.
-        """
-        if not replacement:
-            raise GraphError("replacement asset is empty")
-        target = self.module(index)
-        insertion = self.offsets_at
-        old_offsets = bytes(
-            self.data[self.offsets_at : self.offsets_at + OFFSETS_SIZE]
-        )
-        old_trailer = bytes(self.data[self.offsets_at + OFFSETS_SIZE :])
-        output = self.data[: self.offsets_at] + replacement + old_offsets + old_trailer
-        new_offsets_at = self.offsets_at + len(replacement)
-        struct.pack_into(
-            "<II", output, target.record_offset + 8, insertion, len(replacement)
-        )
-        struct.pack_into(
-            "<QIIIIII",
-            output,
-            new_offsets_at,
-            new_offsets_at,
-            self.modules_at,
-            self.modules_len,
-            self.entry,
-            self.argv_at,
-            self.argv_len,
-            self.flags,
-        )
-        before = len(self.data)
-        self.data = output
-        self._parse()
-        return {
-            "module_index": index,
-            "module_name": target.display_name,
-            "old_contents_offset": target.contents_offset,
-            "old_contents_bytes": target.contents_length,
-            "new_contents_offset": insertion,
-            "new_contents_bytes": len(replacement),
-            "graph_bytes_before": before,
-            "graph_bytes_after": len(self.data),
-        }
-
-    def write(self, path: str) -> None:
-        with open(path, "wb") as stream:
-            stream.write(self.data)

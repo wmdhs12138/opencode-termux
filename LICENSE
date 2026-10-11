@@ -24,10 +24,7 @@ SOFTWARE.
 
 Third-party notices:
 
-- tools/revive_patch.py is vendored, unmodified, from
-  https://github.com/Hope2333/opencode-termux (native-android branch),
-  MIT License, Copyright (c) Hope2333 (幽零小喵).
-- tools/extract_graph.py and tools/verify_graft.py are derived from
-  claude-code-termux under the same MIT license.
-- OpenCode is downloaded from anomalyco/opencode at build time and remains
-  subject to its upstream license.
+- tools/extract_graph.py is derived from claude-code-termux under the same
+  MIT license.
+- OpenCode source is downloaded from anomalyco/opencode at build time and
+  remains subject to its upstream license; patches/opencode-*.patch modify it.

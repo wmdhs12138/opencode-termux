@@ -7,7 +7,8 @@ name: build
 #              decides whether anything new needs to be released.
 #   tests   -- Python and shell regression tests; pull requests stop here.
 #   bionic  -- ARM64 runner + pinned termux-docker. Builds the Bionic native
-#              assets and the graft, then executes them; contents stay read-only.
+#              assets in Termux, compiles OpenCode from source on the runner,
+#              then executes the binary in Termux; contents stay read-only.
 #   release -- the only job with write permission; publishes the package.
 #
 # Toolchain changes are not released on their own: they ship with the next
@@ -105,7 +106,7 @@ jobs:
       github.event_name != 'pull_request' &&
       (github.event_name != 'schedule' || needs.resolve.outputs.unreleased == 'true')
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 90
+    timeout-minutes: 120
     outputs:
       package: ${{ steps.package.outputs.package }}
       version: ${{ needs.resolve.outputs.version }}
@@ -116,22 +117,45 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build and test inside Bionic Termux
-        env:
-          OPENCODE_VERSION: ${{ needs.resolve.outputs.version }}
-          GH_TOKEN: ${{ github.token }}
+      - name: Build the Bionic native assets inside Termux
         run: |
           set -euo pipefail
           docker pull "$TERMUX_DOCKER_IMAGE"
           sudo chmod -R a+rwX "$GITHUB_WORKSPACE"
           docker run --rm --privileged \
-            -e OPENCODE_VERSION_INPUT="$OPENCODE_VERSION" \
-            -e GITHUB_TOKEN="$GH_TOKEN" \
-            -e TERMUX_DOCKER_IMAGE="$TERMUX_DOCKER_IMAGE" \
             -v "$GITHUB_WORKSPACE:/data/data/com.termux/files/home/opencode-termux" \
             -w /data/data/com.termux/files/home/opencode-termux \
             "$TERMUX_DOCKER_IMAGE" \
-            bash .github/ci/bionic-build.sh
+            bash .github/ci/bionic-build.sh natives
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+
+      # Upstream's install scripts run node-gyp, which needs a current Node.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      # Not in Termux: scripts/compile.sh explains why.
+      - name: Compile OpenCode from source
+        env:
+          OPENCODE_VERSION: ${{ needs.resolve.outputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install setuptools || pip install setuptools || true
+          make fetch-source VERSION="$OPENCODE_VERSION"
+          make compile
+          rm -rf work/build/src
+
+      - name: Verify inside Termux and package
+        run: |
+          set -euo pipefail
+          sudo chmod -R a+rwX "$GITHUB_WORKSPACE"
+          docker run --rm --privileged \
+            -v "$GITHUB_WORKSPACE:/data/data/com.termux/files/home/opencode-termux" \
+            -w /data/data/com.termux/files/home/opencode-termux \
+            "$TERMUX_DOCKER_IMAGE" \
+            bash .github/ci/bionic-build.sh verify "$TERMUX_DOCKER_IMAGE"
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
 
       - name: Verify Bionic build manifest
         run: |
@@ -140,6 +164,7 @@ jobs:
           import json
           doc = json.load(open("dist/build-manifest.json"))
           assert doc["opencode"] == "${{ needs.resolve.outputs.version }}", doc
+          assert doc["source"]["tag"] == "v" + doc["opencode"], doc
           assert doc["native_assets"]["result"] == "pass", doc
           assert doc["tui_smoke"] == "pass", doc
           assert doc["release_eligible"] is True, doc
