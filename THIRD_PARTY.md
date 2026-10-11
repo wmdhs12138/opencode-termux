@@ -1,6 +1,6 @@
 # Third-party components
 
-The generated executable combines or transforms the following upstream work:
+The generated executable is compiled from, or links, the following upstream work:
 
 - [OpenCode](https://github.com/anomalyco/opencode), MIT
 - [Bun](https://github.com/oven-sh/bun), MIT
@@ -15,7 +15,8 @@ their respective upstream licenses. Source versions and immutable archive
 hashes used directly by this project are recorded in `versions.json` and the
 release `BUILD-MANIFEST.json`.
 
-`tools/revive_patch.py` is vendored from
-[Hope2333/opencode-termux](https://github.com/Hope2333/opencode-termux), MIT,
-with one local fix that keeps the base's non-loaded tail out of `.bss`
-(see the file header; sent upstream as Hope2333/opencode-termux#34).
+Releases up to v1.18.35-r1 were not compiled from source: they grafted the
+official build's module graph onto the Android Bun with `tools/revive_patch.py`,
+vendored from [Hope2333/opencode-termux](https://github.com/Hope2333/opencode-termux),
+MIT (with a fix sent upstream as Hope2333/opencode-termux#34). The current
+build no longer contains it.
