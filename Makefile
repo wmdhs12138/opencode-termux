@@ -28,7 +28,7 @@ build-fff: fetch-bun
 build-rust-pty: fetch-bun
 	bash scripts/build-rust-pty.sh
 
-build-native: build-watcher build-opentui build-fff build-rust-pty
+build-native: build-watcher build-fff build-rust-pty build-opentui
 
 build-opencode-pty:
 	bash scripts/build-opencode-pty.sh

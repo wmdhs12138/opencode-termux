@@ -1,8 +1,8 @@
 # opencode-termux
 
-让官方 [OpenCode](https://github.com/anomalyco/opencode) 在 Termux 原生运行。
+让官方 [OpenCode](https://github.com/anomalyco/opencode) 2 在 Termux 原生运行。
 
-本项目将 Linux AArch64 standalone 中的 glibc 原生组件替换为 Bionic 版本，最终产物可由 Android linker 直接加载，无需 glibc、proot 或其他兼容层。
+从 OpenCode 源码编译，原生组件也全部从源码重建为 Bionic 版本，最终产物由 Android linker 直接加载，无需 glibc、proot 或其他兼容层。
 
 [![build](https://github.com/wmdhs12138/opencode-termux/actions/workflows/build.yml/badge.svg)](https://github.com/wmdhs12138/opencode-termux/actions/workflows/build.yml)
 [![release](https://img.shields.io/github/v/release/wmdhs12138/opencode-termux?display_name=tag&sort=semver)](https://github.com/wmdhs12138/opencode-termux/releases/latest)
@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/ins
 安装指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | VERSION=1.18.32 bash
+curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | VERSION=2.0.26 bash
 ```
 
 `VERSION=X.Y.Z` 安装该版本最新的一次构建，`VERSION=X.Y.Z-rN` 安装指定的那一次。
@@ -30,16 +30,16 @@ curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/ins
 ## 更新
 
 ```bash
-opencode update   # 检查是否有新版本
-opencode upgrade  # 下载并安装新版本
+opencode upgrade   # 也可以写成 opencode update
 ```
 
-两个命令均使用本项目经过 Bionic CI 验证的 Release，不会下载官方 glibc 版本。重复运行安装命令也可以完成更新。
+使用本项目经过 Bionic CI 验证的 Release，不会下载官方版本。重复运行安装命令也可以完成更新。
 
-OpenCode 2 还没有 Termux 版本：`opencode upgrade --major` 和 TUI 里的 OpenCode 2 升级在本构建中不可用（上游的升级会安装官方 glibc 版，在 Termux 上无法运行）。
+同一 OpenCode 版本因构建工具链更新（例如 Bun 底座）重新发布时，tag 是 `vX.Y.Z-rN`。`upgrade` 按二进制哈希判断，能识别这种重新发布。
 
-同一 OpenCode 版本因构建工具链更新（例如 Bun 底座）重新发布时，tag 是 `vX.Y.Z-rN`。`update` 和 `upgrade` 按二进制哈希判断，
-能识别这种重新发布；v1.18.35 及更早版本自带的 `upgrade` 只比较版本号，需要重新运行一次安装命令。
+### 从 OpenCode 1 升级
+
+本项目已跟随上游切换到 OpenCode 2，不再发布 OpenCode 1。已安装 1.x 的直接运行 `opencode upgrade`（1.18.32 及更早的版本请重新运行一次安装命令）。OpenCode 2 首次启动时会迁移 1.x 的会话和登录凭据；配置格式有变化，见 [OpenCode 2 文档](https://opencode.ai/v2/docs)。
 
 ## 实现
 
@@ -49,7 +49,7 @@ OpenCode 2 还没有 Termux 版本：`opencode upgrade --major` 和 TUI 里的 O
 OpenCode vX.Y.Z 源码
         │ Android 补丁（patches/opencode-*.patch）
         │ bun install
-        │ 换入在 Termux 里从源码编译的 Bionic 原生组件
+        │ 换入从源码编译的原生组件（Bionic 库，静态 opencode-pty）
         ▼
 bun build --compile（glibc 主机，嵌入官方 Android Bun）
         │ 在 Termux 里运行验收
@@ -81,7 +81,7 @@ GitHub Actions 在 ARM64 runner 上完成构建，Bionic 部分都在官方 Term
 make build-native
 
 # glibc AArch64 Linux（ARM64 服务器，或 proot-distro 里的 Ubuntu），同一个仓库目录
-make fetch-source VERSION=1.18.35
+make fetch-source VERSION=2.0.26
 make compile
 
 # Termux：验收，通过后得到 dist/opencode

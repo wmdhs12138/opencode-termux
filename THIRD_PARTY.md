@@ -9,6 +9,8 @@ The generated executable is compiled from, or links, the following upstream work
 - [@parcel/watcher](https://github.com/parcel-bundler/watcher), MIT
 - [bun-pty](https://github.com/sursaone/bun-pty), MIT
 - [portable-pty](https://github.com/wezterm/wezterm/tree/main/pty), MIT
+- [opencode-pty](https://github.com/anomalyco/opencode-pty), MIT, with
+  [Ghostty](https://github.com/ghostty-org/ghostty)'s VT library, MIT, linked in
 
 The build also contains transitive Rust, Zig, C and C++ dependencies under
 their respective upstream licenses. Source versions and immutable archive
