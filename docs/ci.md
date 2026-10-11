@@ -49,12 +49,11 @@ the Bun base, NDK generation or native ABI patches.
 Add `[skip ci]` to a commit message to skip the push build, then re-release
 with `gh workflow run build.yml -f version=latest -f recut=true` if needed.
 
-To test a branch without releasing, dispatch it with a version that already has
-a release and `recut=false`: the build and every acceptance step run, the
-release job is skipped.
+Only `main` publishes. Dispatching a branch runs the build and every acceptance
+step for any version, released or not, and skips the release job:
 
 ```bash
-gh workflow run build.yml --ref <branch> -f version=1.18.35 -f recut=false
+gh workflow run build.yml --ref <branch> -f version=latest
 ```
 
 ## Releases

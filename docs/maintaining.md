@@ -62,11 +62,11 @@ git add -A && git diff --cached > ../../../patches/opencode-0002-update-from-ter
 
 已经装在用户手机上的 `opencode` 会在 `upgrade` 时从 `main` 下载 `install.sh` 来运行，所以下面这些对它们是接口：
 
-- `install.sh` 的环境变量 `VERSION`（`latest`、`X.Y.Z`，或 `X.Y.Z-rN`）、`PREFIX`、`OPENCODE_TERMUX_REPO`。旧版本只会传 `X.Y.Z`，它表示这个版本最新的那次构建；
+- `install.sh` 的环境变量 `VERSION`（`latest`、`X.Y.Z`，或 `X.Y.Z-rN`）、`PREFIX`、`OPENCODE_TERMUX_REPO`，以及 OpenCode 2 传的参数 `--version X.Y.Z --no-modify-path`。已安装的版本只会传 `X.Y.Z`，它表示这个版本最新的那次构建；
 - Release 附件名 `opencode-termux-v<版本>-android-aarch64.zip`、`.zip.sha256` 和 `build-manifest.json`，`-rN` 重发时附件名里仍是不带 `-rN` 的版本；
-- 清单字段 `tag_name`（`Installation.latest()` 读它，必须保持 `vX.Y.Z`，带上 `-rN` 会让 TUI 每次启动都认为有新版本并在后台重装）和 `output_sha256`（`install.sh`、`update`、`upgrade` 按它判断是否同一个构建）。
+- 清单字段 `tag_name`（更新检查读它，必须保持 `vX.Y.Z`，带上 `-rN` 会让 TUI 每次都认为有新版本）和 `output_sha256`（`install.sh` 和 `upgrade` 按它判断是否同一个构建）。
 
-v1.18.35 及更早的二进制自带的 `upgrade` 只比较版本，会跳过同版本的 `-rN`；它们要重新运行一次安装命令，之后的版本就按哈希判断了。
+还装着 OpenCode 1 的用户也走这套接口：1.18.33 到 1.19.0 的 `upgrade` 读同一个清单，看到 2.x 就会升级；1.18.32 及更早的更新器还指向官方，要重新运行一次安装命令。
 
 ## 踩过的坑
 
@@ -75,5 +75,6 @@ v1.18.35 及更早的二进制自带的 `upgrade` 只比较版本，会跳过同
 - **FFF 在 Android 上崩溃。** 堆指针高字节带 tag，`read.ptr()` 返回的 number 丢了这些位。用 Release 里的 `libfff_c.so` 和未打补丁的 wrapper 就能在手机上复现。
 - **termux-docker 里没有 `/usr/bin/env`。** `make test` 也会在 Bionic 容器里跑，测试造的假命令要用 `sys.executable` 或 `shutil.which("bash")` 的绝对路径做解释器。
 - **api.github.com 匿名每小时 60 次。** 手机常在运营商 NAT 后面，很快用完；安装器和更新检查都只用 Release 页面的跳转和 Release 附件，它们不受这个限制。
-- **大目录里 `opencode debug file search` 可能返回空。** 扫描还没完成搜索就返回了，所以验收用一个只有两个文件的小目录。
+- **FFF 的搜索要等扫描。** 大目录里扫描还没完成搜索就返回空，所以 `serve_smoke.py` 用一个只有两个文件的小目录，并且重试到超时。
+- **opencode-pty 把 socket 放在 `/tmp`。** Android 没有 `/tmp`，daemon 一启动就退出（`Permission denied`）；补丁改到 `$PREFIX/tmp`。用 `proot -b $PREFIX/tmp:/tmp` 运行上游的二进制可以在手机上对照验证。
 - Android 上 `/tmp` 不可写，临时文件放 `$TMPDIR`。

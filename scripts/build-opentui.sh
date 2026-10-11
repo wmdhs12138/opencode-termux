@@ -51,6 +51,12 @@ mkdir -p "$STAGE/source" "$STAGE/zig"
 tar -xzf "$SOURCE_ARCHIVE" -C "$STAGE/source" --strip-components=1
 tar -xJf "$ZIG_ARCHIVE" -C "$STAGE/zig" --strip-components=1
 patch -d "$STAGE/source" -p1 < "$ROOT/patches/opentui-android.patch"
+# The Zig dependencies are vendored in the archive. Unpack them here rather than
+# with packages/native/scripts/prepare-zig-deps.sh: inside proot-distro in CI
+# that script never returned, and its lock retries a failed `ln` without pause.
+mkdir -p "$STAGE/source/packages/native/zig-deps"
+tar -xzf "$STAGE/source/packages/native/src/vendor/zig-deps.tar.gz" \
+  -C "$STAGE/source/packages/native/zig-deps"
 clang -c -fPIC "$ROOT/native/tls-align.S" -o "$STAGE/tls-align.o"
 
 NDK="$STAGE/termux-ndk"
