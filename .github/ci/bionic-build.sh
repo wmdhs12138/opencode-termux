@@ -1,14 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # The Termux halves of the bionic job, run inside termux-docker:
 #
-#   bionic-build.sh natives  test, then build the four Bionic native assets
-#   bionic-build.sh verify   run the compiled candidate, then package it
+#   bionic-build.sh natives        test, then build the four Bionic native assets
+#   bionic-build.sh verify IMAGE   run the compiled candidate, then package it
 #
 # Between them the runner itself compiles OpenCode (scripts/compile.sh).
+# Arguments, not `docker run -e`: the image's entrypoint drops the environment.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-PHASE="${1:?usage: bionic-build.sh natives|verify}"
+PHASE="${1:?usage: bionic-build.sh natives|verify IMAGE}"
+IMAGE="${2:-unknown}"
 DISTRO="${ANDROID_BUILD_DISTRO:-ubuntu}"
 cd "$ROOT"
 
@@ -78,7 +80,7 @@ verify() {
     printf 'target=android-aarch64\n'
     printf 'runtime=bionic\n'
     printf 'android_api=28\n'
-    printf 'termux_docker=%s\n' "${TERMUX_DOCKER_IMAGE:-unknown}"
+    printf 'termux_docker=%s\n' "$IMAGE"
     python3 - <<'PY'
 import json
 doc = json.load(open("dist/build-manifest.json"))

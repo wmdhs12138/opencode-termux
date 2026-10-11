@@ -123,7 +123,6 @@ jobs:
           docker pull "$TERMUX_DOCKER_IMAGE"
           sudo chmod -R a+rwX "$GITHUB_WORKSPACE"
           docker run --rm --privileged \
-            -e TERMUX_DOCKER_IMAGE="$TERMUX_DOCKER_IMAGE" \
             -v "$GITHUB_WORKSPACE:/data/data/com.termux/files/home/opencode-termux" \
             -w /data/data/com.termux/files/home/opencode-termux \
             "$TERMUX_DOCKER_IMAGE" \
@@ -152,11 +151,10 @@ jobs:
           set -euo pipefail
           sudo chmod -R a+rwX "$GITHUB_WORKSPACE"
           docker run --rm --privileged \
-            -e TERMUX_DOCKER_IMAGE="$TERMUX_DOCKER_IMAGE" \
             -v "$GITHUB_WORKSPACE:/data/data/com.termux/files/home/opencode-termux" \
             -w /data/data/com.termux/files/home/opencode-termux \
             "$TERMUX_DOCKER_IMAGE" \
-            bash .github/ci/bionic-build.sh verify
+            bash .github/ci/bionic-build.sh verify "$TERMUX_DOCKER_IMAGE"
           sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
 
       - name: Verify Bionic build manifest
