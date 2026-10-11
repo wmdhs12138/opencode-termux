@@ -26,48 +26,14 @@ export TERMUX_PKG_NO_MIRROR_SELECT=1
 TEST_PACKAGES=(bash coreutils curl file git make patch python unzip zip)
 
 natives() {
+  pkg update -y
+  pkg install -y "${TEST_PACKAGES[@]}"
+  make test
   if [ "${1:-}" = cached ] && [ -f work/native/BUILD-INFO.txt ] && [ -d work/android-ndk ]; then
-    pkg update -y
-    pkg install -y "${TEST_PACKAGES[@]}"
-    make test
     echo "bionic-build: reusing the native assets of an earlier run with the same inputs"
     return
   fi
-
-  echo "::group::Install Termux build dependencies"
-  pkg update -y
-  pkg install -y "${TEST_PACKAGES[@]}" \
-    binutils clang nodejs procps proot-distro ndk-multilib ndk-multilib-native-static
-  echo "::endgroup::"
-
-  echo "::group::Prepare glibc host tools"
-  if ! proot-distro login "$DISTRO" -- true >/dev/null 2>&1; then
-    proot-distro install "$DISTRO"
-  fi
-  proot-distro login "$DISTRO" -- bash -lc '
-    set -euo pipefail
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update
-    apt-get install -y --no-install-recommends \
-      build-essential ca-certificates cmake curl pkg-config
-    if [ ! -f "$HOME/.cargo/env" ]; then
-      curl --proto "=https" --tlsv1.2 -fsSL https://sh.rustup.rs \
-        | sh -s -- -y --profile minimal --default-toolchain none
-    fi
-    . "$HOME/.cargo/env"
-    rustup toolchain install 1.90.0 --profile minimal --target aarch64-linux-android
-  '
-  echo "::endgroup::"
-
-  make test
-  ANDROID_BUILD_DISTRO="$DISTRO" make build-native
-
-  {
-    printf 'clang=%s\n' "$(clang --version | sed -n '1p')"
-    printf 'rust=%s\n' "$(proot-distro login "$DISTRO" -- bash -lc '. "$HOME/.cargo/env"; rustc +1.90.0 --version')"
-    dpkg-query -W -f='package=${Package} version=${Version}\n' \
-      ndk-multilib ndk-multilib-native-static proot-distro
-  } > work/native/BUILD-INFO.txt
+  ANDROID_BUILD_DISTRO="$DISTRO" bash .github/ci/natives.sh
 }
 
 verify() {

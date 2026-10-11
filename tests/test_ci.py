@@ -21,6 +21,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "build.yml"
 BIONIC_CI = ROOT / ".github" / "ci" / "bionic-build.sh"
+NATIVES_CI = ROOT / ".github" / "ci" / "natives.sh"
 BASH = shutil.which("bash")
 
 MANIFEST = {
@@ -232,7 +233,8 @@ class WorkflowWiringTests(unittest.TestCase):
 
     def test_bionic_path_compiles_from_source_and_executes_the_candidate(self):
         self.assertNotIn("SKIP_RUN", self.script)
-        self.assertIn("make build-native", self.script)
+        self.assertIn("bash .github/ci/natives.sh", self.script)
+        self.assertIn("make build-native", NATIVES_CI.read_text())
         self.assertIn("make verify", self.script)
         self.assertIn("make fetch-source", self.workflow)
         self.assertIn("make compile", self.workflow)
