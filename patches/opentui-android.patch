@@ -77,3 +77,23 @@ index b226da7..21aa1ad 100644
  
      addNativeAudioDependencies(b, module, target, macos_sdk_path);
      addYogaDependencies(b, module);
+diff --git a/packages/native/src/clipboard/host.zig b/packages/native/src/clipboard/host.zig
+index 6305136..68e7c2f 100644
+--- a/packages/native/src/clipboard/host.zig
++++ b/packages/native/src/clipboard/host.zig
+@@ -104,7 +104,14 @@ extern "c" fn pthread_peekjoin_np(thread: std.Thread.Handle, result: ?*?*anyopaq
+ 
+ fn tryJoinThread(thread: std.Thread) bool {
+     return switch (builtin.os.tag) {
+-        .linux => switch (pthread_tryjoin_np(thread.getHandle(), null)) {
++        .linux => if (comptime builtin.abi.isAndroid()) blk: {
++            // opencode-termux: Bionic has no pthread_tryjoin_np. Once a thread
++            // exits the kernel clears its tid and Bionic's pthread_kill reports
++            // ESRCH, so joining it then does not block.
++            if (std.c.pthread_kill(thread.getHandle(), @enumFromInt(0)) == 0) break :blk false;
++            thread.join();
++            break :blk true;
++        } else switch (pthread_tryjoin_np(thread.getHandle(), null)) {
+             0 => true,
+             @intFromEnum(std.posix.E.BUSY) => false,
+             else => false,
