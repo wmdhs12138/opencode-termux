@@ -5,6 +5,12 @@
     "archive_sha256": "e8848b6c67769ef1dcf932c1aabafbeaefdea0dd98f715e9455424998242deda",
     "binary_sha256": "2b5881c336d40ec07543f680a0c41047a113993e6e15ff904255a58597d3f8d2"
   },
+  "host_bun": {
+    "version": "1.4.3+c6da4a4d3",
+    "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-aarch64.zip",
+    "archive_sha256": "efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21",
+    "binary_sha256": "029ece746ac9f970c76d8f48bdd1b1d0c52f3636b74d19f546f5e7c1165c0abe"
+  },
   "android_ndk": {
     "version": "27.2.12479018",
     "api": 28

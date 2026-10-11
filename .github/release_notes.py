@@ -23,13 +23,15 @@ def release_notes(manifest, tag, commit, predecessor, changelog):
     m = manifest
     ver = m.get("opencode", "?")
     bun = m.get("base_bun") or {}
+    source = m.get("source") or {}
     accepted = (
         m.get("release_eligible") is True
         and m.get("tui_smoke") == "pass"
         and (m.get("native_assets") or {}).get("result") == "pass"
     )
     if accepted:
-        verification = "Termux Bionic 容器内原生组件 ELF 审计、FFF / watcher / PTY 冒烟和真实 TUI 启动全部通过。"
+        verification = ("从 OpenCode 源码编译；Termux Bionic 容器内原生组件 ELF 审计、"
+                        "FFF / watcher / PTY 冒烟和真实 TUI 启动全部通过。")
     else:
         verification = "⚠️ 未完成 Bionic 运行验收。"
 
@@ -59,7 +61,7 @@ def release_notes(manifest, tag, commit, predecessor, changelog):
 
 | 项目 | 值 |
 |---|---|
-| 官方 opencode-linux-arm64 SHA-256 | `{m.get("input_sha256", "?")}` |
+| OpenCode 源码 | `{source.get("tag", "?")}` · `{source.get("commit", "?")[:12]}` |
 | opencode 二进制 SHA-256 | `{m.get("output_sha256", "?")}` |
 | Bun 底座 | `{bun.get("version", "?")}` |
 | 工具链提交 | `{commit[:12] or "?"}` |

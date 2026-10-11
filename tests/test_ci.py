@@ -25,7 +25,7 @@ BASH = shutil.which("bash")
 
 MANIFEST = {
     "opencode": "1.2.4",
-    "input_sha256": "source-hash",
+    "source": {"tag": "v1.2.4", "commit": "f" * 40},
     "output_sha256": "output-hash",
     "base_bun": {"version": "1.4.3+c6da4a4d3"},
     "native_assets": {"result": "pass"},
@@ -75,7 +75,7 @@ class ReleaseNotesTests(unittest.TestCase):
     def test_hashes_base_install_command_and_changes(self):
         notes = self.module.release_notes(MANIFEST, "v1.2.4", "c" * 40, "v1.2.3",
                                           "abc1234 build: change")
-        self.assertIn("source-hash", notes)
+        self.assertIn("`v1.2.4` · `ffffffffffff`", notes)
         self.assertIn("output-hash", notes)
         self.assertIn("1.4.3+c6da4a4d3", notes)
         self.assertIn("`cccccccccccc`", notes)
@@ -86,6 +86,7 @@ class ReleaseNotesTests(unittest.TestCase):
 
     def test_reports_bionic_acceptance(self):
         notes = self.module.release_notes(MANIFEST, "v1.2.4", "c" * 40, "-", "")
+        self.assertIn("从 OpenCode 源码编译", notes)
         self.assertIn("真实 TUI 启动全部通过", notes)
         self.assertIn("（无）", notes)
         failed = dict(MANIFEST, tui_smoke="skipped-cross-build", release_eligible=False)
@@ -228,9 +229,16 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("runs-on: ubuntu-24.04-arm", self.workflow)
         self.assertRegex(self.workflow, r"termux/termux-docker@sha256:[0-9a-f]{64}")
 
-    def test_bionic_path_executes_the_candidate(self):
+    def test_bionic_path_compiles_from_source_and_executes_the_candidate(self):
         self.assertNotIn("SKIP_RUN", self.script)
-        self.assertIn("make build-strict", self.script)
+        self.assertIn("make build-native", self.script)
+        self.assertIn("make verify", self.script)
+        self.assertIn("make fetch-source", self.workflow)
+        self.assertIn("make compile", self.workflow)
+        natives, compile_, verify = (self.workflow.index(step) for step in (
+            "bionic-build.sh natives", "make compile", "bionic-build.sh verify"))
+        self.assertLess(natives, compile_)
+        self.assertLess(compile_, verify)
         self.assertIn('assert doc["tui_smoke"] == "pass"', self.workflow)
         self.assertIn('assert doc["release_eligible"] is True', self.workflow)
 

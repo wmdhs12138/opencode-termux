@@ -1,13 +1,17 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
+# fetch-bun.sh [OUT_DIR] [KEY]
+#   KEY=base_bun  the Android Bun every release is built on (default)
+#   KEY=host_bun  the same Bun version for glibc AArch64, which compiles it
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/work/bun-android}"
+KEY="${2:-base_bun}"
 mkdir -p "$OUT_DIR"
 read -r URL ARCHIVE_SHA BINARY_SHA < <(
-  python3 - "$ROOT/versions.json" <<'PY'
+  python3 - "$ROOT/versions.json" "$KEY" <<'PY'
 import json, sys
-doc = json.load(open(sys.argv[1]))["base_bun"]
+doc = json.load(open(sys.argv[1]))[sys.argv[2]]
 print(doc["url"], doc["archive_sha256"], doc["binary_sha256"])
 PY
 )
