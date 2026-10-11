@@ -1,5 +1,5 @@
 diff --git a/packages/native/build.zig b/packages/native/build.zig
-index b226da7..1f836c5 100644
+index b226da7..43ec060 100644
 --- a/packages/native/build.zig
 +++ b/packages/native/build.zig
 @@ -367,7 +367,8 @@ fn addNativeAudioDependencies(
@@ -12,15 +12,38 @@ index b226da7..1f836c5 100644
              module.linkSystemLibrary("m", .{});
          },
          else => {},
-@@ -711,6 +712,28 @@ fn buildSingleTarget(
+@@ -421,6 +422,11 @@ fn addTranslatedCImports(
+     });
+     yoga_translate.addIncludePath(yoga_dep.path(""));
+     module.addImport("yoga", yoga_translate.createModule());
++
++    if (target.result.abi == .android) {
++        addAndroidIncludes(b, miniaudio_translate);
++        addAndroidIncludes(b, yoga_translate);
++    }
+ }
+ 
+ /// Apply dependencies to a module
+@@ -711,6 +717,39 @@ fn buildSingleTarget(
      try buildTarget(b, target_str, target_str, description, optimize, build_options, macos_sdk_path);
  }
  
-+// opencode-termux: link against the NDK sysroot that Termux's ndk-multilib
-+// provides, and raise PT_TLS alignment to what Android's linker requires.
++// opencode-termux: the NDK sysroot that Termux's ndk-multilib provides.
++fn androidSysroot(b: *std.Build) []const u8 {
++    const ndk = b.graph.environ_map.get("ANDROID_NDK_HOME") orelse std.debug.panic("ANDROID_NDK_HOME is not set", .{});
++    return b.pathJoin(&.{ ndk, "toolchains", "llvm", "prebuilt", "linux-x86_64", "sysroot", "usr" });
++}
++
++fn addAndroidIncludes(b: *std.Build, translate: *std.Build.Step.TranslateC) void {
++    const include = b.pathJoin(&.{ androidSysroot(b), "include" });
++    translate.addSystemIncludePath(.{ .cwd_relative = include });
++    translate.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ include, "aarch64-linux-android" }) });
++}
++
++// opencode-termux: link against the NDK sysroot and raise PT_TLS alignment to
++// what Android's linker requires.
 +fn addAndroidSysroot(b: *std.Build, lib: *std.Build.Step.Compile, module: *std.Build.Module) !void {
-+    const ndk = b.graph.environ_map.get("ANDROID_NDK_HOME") orelse return error.AndroidNDKNotFound;
-+    const sysroot = b.pathJoin(&.{ ndk, "toolchains", "llvm", "prebuilt", "linux-x86_64", "sysroot", "usr" });
++    const sysroot = androidSysroot(b);
 +    const include = b.pathJoin(&.{ sysroot, "include" });
 +    const library = b.pathJoin(&.{ sysroot, "lib", "aarch64-linux-android" });
 +    const files = b.addWriteFiles();
@@ -41,7 +64,7 @@ index b226da7..1f836c5 100644
  fn buildTarget(
      b: *std.Build,
      zig_target: []const u8,
-@@ -746,6 +769,7 @@ fn buildTarget(
+@@ -746,6 +785,7 @@ fn buildTarget(
      });
  
      if (target.result.os.tag == .linux and optimize != .Debug) lib.build_id = .sha1;

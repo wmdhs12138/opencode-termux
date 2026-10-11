@@ -24,7 +24,7 @@ natives() {
   echo "::group::Install Termux build dependencies"
   pkg update -y
   pkg install -y \
-    bash binutils clang coreutils curl file git make nodejs patch python unzip zip \
+    bash binutils clang coreutils curl file git make nodejs patch procps python unzip zip \
     proot-distro ndk-multilib ndk-multilib-native-static
   echo "::endgroup::"
 
