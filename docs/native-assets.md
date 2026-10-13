@@ -5,7 +5,7 @@
 | npm 包里的文件 | 上游 | `DT_NEEDED` |
 |---|---:|---|
 | `@opentui/core-linux-arm64/libopentui.so` | OpenTUI 0.4.5 | `libm.so`, `libc.so`, `libdl.so` |
-| `@ff-labs/fff-bin-linux-arm64-gnu/libfff_c.so` | FFF 0.9.4 | `libz.so`, `libdl.so`, `libm.so`, `libc.so` |
+| `@ff-labs/fff-bin-linux-arm64-gnu/libfff_c.so` | FFF 0.10.5 | `libz.so`, `libdl.so`, `libm.so`, `libc.so` |
 | `@parcel/watcher-linux-arm64-glibc/watcher.node` | `@parcel/watcher` 2.5.1 | `liblog.so`, `libdl.so`, `libm.so`, `libc.so` |
 | `bun-pty/rust-pty/target/release/librust_pty_arm64.so` | `bun-pty` 0.4.11 | `libdl.so`, `libc.so` |
 | `bun-pty/rust-pty/target/release/librust_pty_arm64_musl.so` | 同上，同一个文件 | `libdl.so`, `libc.so` |
@@ -22,13 +22,17 @@ Bun 生成的哈希后缀，如 `libopentui-x8k2b6xk.so`。
 
 ## FFF pointer boundary
 
-Bionic 的 tagged heap pointer 可能大于 JavaScript 的安全整数上限。FFF 0.9.4 的 Bun
-wrapper 使用 `read.ptr()` 并以 `number` 做地址运算，实例创建后执行文件搜索会丢失地址
-位并崩溃。`patches/fff-bun-android.patch` 在编译前修补 `@ff-labs/fff-bun` 的源码：
-指针字段改用 `read.u64()`，地址以 `bigint` 保存，数组步进也使用 `BigInt`；目录和混合
-搜索不再逐项调用返回 number 的 getter，而是从结果结构体读取数组基址。文件、目录、
-混合搜索和 grep 已在真机上通过，发布验收用 `opencode debug file search` 经由打包后的
-wrapper 再测一次。
+Bionic 的 tagged heap pointer 可能大于 JavaScript 的安全整数上限。FFF 的 Bun wrapper
+使用 `read.ptr()` 并以 `number` 做地址运算，实例创建后执行文件搜索会丢失地址位并崩溃
+（`Segmentation fault at address 0x7FFFFFFFFFFFFFFF`），销毁实例时也一样。
+`patches/fff-bun-android.patch` 在编译前修补 `@ff-labs/fff-bun`：指针字段改用
+`read.u64()`，地址以 `bigint` 保存，数组步进也使用 `BigInt`；目录和混合搜索不再逐项
+调用返回 number 的 getter，而是从结果结构体读取数组基址。
+
+Bun 解析这个包时走 `exports` 的 `bun` 条件，打包的是 `src/ffi.ts` 而不是
+`dist/index.js`，补丁两处都改。文件、目录和混合搜索已在真机上通过；发布验收由
+`tools/serve_smoke.py` 在 git 仓库里经 `opencode serve` 再测一次打包后的 wrapper，非
+仓库目录 OpenCode 用 ripgrep，测不到 FFF。
 
 ## Watcher
 

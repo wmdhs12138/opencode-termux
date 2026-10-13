@@ -14,7 +14,7 @@ make test                        # 回归测试，几秒，不联网
 | --- | --- | --- |
 | `opencode-000N-*.patch does not apply` | 上游改了补丁涉及的代码 | 在新 tag 的源码上重做这个补丁（见下文），补丁一律 fuzz 0 |
 | `swap_native_assets: ... pins X, installed: Y` | 上游升级了某个原生依赖 | 在 `versions.json` 把组件升到 Y，确认 `patches/` 里对应的补丁还适用，CI 会从源码重新编译组件 |
-| `fff-bun-android.patch does not apply` | FFF 的 Bun wrapper 变了 | 重做补丁；手机上可以用 Release 里的 `libfff_c.so` 直接测 wrapper |
+| `fff-bun-android.patch does not apply` | FFF 的 Bun wrapper 变了 | 重做补丁，`src/ffi.ts` 和 `dist/index.js` 都要改；手机上可以用 Release 里的 `libfff_c.so` 直接测 wrapper |
 | `a native asset in the binary is not Bionic` | 产物里出现了新的原生模块 | 看 `work/build/native-assets.json`，见 [native-assets.md](native-assets.md) |
 | `host Bun ... cannot compile for Android Bun ...` | `versions.json` 的 `host_bun` 和 `base_bun` 版本不同 | 两者总是一起改 |
 | verify 里的 `update` / 文件搜索 / TUI 冒烟 | 运行时问题 | 看 `work/build/*-smoke.log`（CI 的日志里有输出） |
@@ -75,6 +75,8 @@ git add -A && git diff --cached > ../../../patches/opencode-0002-update-from-ter
 - **FFF 在 Android 上崩溃。** 堆指针高字节带 tag，`read.ptr()` 返回的 number 丢了这些位。用 Release 里的 `libfff_c.so` 和未打补丁的 wrapper 就能在手机上复现。
 - **termux-docker 里没有 `/usr/bin/env`。** `make test` 也会在 Bionic 容器里跑，测试造的假命令要用 `sys.executable` 或 `shutil.which("bash")` 的绝对路径做解释器。
 - **api.github.com 匿名每小时 60 次。** 手机常在运营商 NAT 后面，很快用完；安装器和更新检查都只用 Release 页面的跳转和 Release 附件，它们不受这个限制。
+- **补丁要打在 Bun 实际打包的文件上。** `@ff-labs/fff-bun` 的 `exports` 有 `bun` 条件，指向 `src/index.ts`；只补 `dist/index.js` 时补丁照样按 fuzz 0 应用、编译照样通过，产物一搜索就崩。OpenCode 2 最初的构建就是这样，用 `grep -a` 在产物里找补丁删掉的代码（比如 `fff_mixed_search_result_get_item(`）能确认打包的是哪一份。
+- **OpenCode 2 只在 git 仓库里用 FFF。** 其他目录走 ripgrep，所以 `serve_smoke.py` 先 `git init`，并确认服务端把它认作 git 项目；verify 容器因此要装 git。
 - **FFF 的搜索要等扫描。** 大目录里扫描还没完成搜索就返回空，所以 `serve_smoke.py` 用一个只有两个文件的小目录，并且重试到超时。
 - **opencode-pty 把 socket 放在 `/tmp`。** Android 没有 `/tmp`，daemon 一启动就退出（`Permission denied`）；补丁改到 `$PREFIX/tmp`。用 `proot -b $PREFIX/tmp:/tmp` 运行上游的二进制可以在手机上对照验证。
 - Android 上 `/tmp` 不可写，临时文件放 `$TMPDIR`。

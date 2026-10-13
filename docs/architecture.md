@@ -35,7 +35,7 @@ Bun 照常执行这些已经写死的分支。
 | `opencode-0001-compile-on-android-bun` | `build.ts` 的 `compileExecutable()` 从 `OPENCODE_TERMUX_BUN` 取被嵌入的 Bun |
 | `opencode-0002-update-from-termux-releases` | 更新服务（`services/updater.ts`）：`$PREFIX/bin` 识别为 curl 安装，最新版读本项目 Release 的 `build-manifest.json`，安装脚本换成本项目的 `install.sh`；`upgrade`（别名 `update`）遇到同版本时按二进制哈希判断（`src/termux.ts`） |
 | `opencode-0003-ripgrep-from-termux` | 找不到 `rg` 时不再下载 ripgrep 的官方 glibc 版，提示 `pkg install ripgrep`；`install.sh` 会装上 Termux 打包的 ripgrep |
-| `fff-bun-android` | FFF 的 Bun wrapper（`dist/index.js`）用 `read.u64` 读指针并以 bigint 运算：Android AArch64 的堆指针高字节带 tag，JavaScript number 存不下 |
+| `fff-bun-android` | FFF 的 Bun wrapper 用 `read.u64` 读指针并以 bigint 运算：Android AArch64 的堆指针高字节带 tag，JavaScript number 存不下。Bun 按 `bun` 导出条件打包 `src/ffi.ts`，`dist/index.js` 也一并修补 |
 | `opencode-pty-termux` | opencode-pty 的 socket 目录从 `/tmp`（Android 没有）改到 `$PREFIX/tmp` |
 | `opentui-android`、`bun-pty-android` | 原生组件本身的 Android 构建，见 [native-assets.md](native-assets.md) |
 
@@ -69,7 +69,7 @@ OpenCode 启动的独立程序，按上游 musl 版的方式编成静态可执�
 1. 补丁全部按 fuzz 0 应用，原生组件版本与 `versions.json` 一致；
 2. 产物模块图里的内嵌 ELF 都是 AArch64，且没有 glibc 依赖；
 3. `--version` 与源码 tag 一致；
-4. `opencode serve` 的文件搜索接口经由打过补丁的 FFF wrapper 找到文件（`tools/serve_smoke.py`）；
+4. `opencode serve` 的文件搜索接口在 git 仓库里（OpenCode 只在仓库里用 FFF）经由打过补丁的 FFF wrapper 找到文件，服务端搜索后和退出时都不崩溃（`tools/serve_smoke.py`）；
 5. TUI 在隔离 HOME 中渲染真实帧；
 6. opencode-pty 在 Termux 里跑通一个真实 shell 会话；
 7. 原生组件各自的 FFF / watcher / PTY 冒烟通过（在组件编译时）。

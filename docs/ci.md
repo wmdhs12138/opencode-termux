@@ -20,7 +20,7 @@ ubuntu-24.04-arm GitHub runner
 │   ├── bun install, the native assets swapped into node_modules
 │   └── bun build --compile, embedded into the pinned Android Bun
 └── termux-docker (pinned): bionic-build.sh verify
-    ├── --version, OpenTUI load, file search through `opencode serve`
+    ├── --version, OpenTUI load, FFF search in a git repo through `opencode serve`
     ├── an opencode-pty session and the real OpenCode TUI smoke test
     └── package
 ```
