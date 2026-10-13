@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/ins
 安装指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | VERSION=2.0.26 bash
+curl -fsSL https://raw.githubusercontent.com/wmdhs12138/opencode-termux/main/install.sh | VERSION=2.0.28 bash
 ```
 
 `VERSION=X.Y.Z` 安装该版本最新的一次构建，`VERSION=X.Y.Z-rN` 安装指定的那一次。
@@ -81,7 +81,7 @@ GitHub Actions 在 ARM64 runner 上完成构建，Bionic 部分都在官方 Term
 make build-native
 
 # glibc AArch64 Linux（ARM64 服务器，或 proot-distro 里的 Ubuntu），同一个仓库目录
-make fetch-source VERSION=2.0.26
+make fetch-source VERSION=2.0.28
 make compile
 
 # Termux：验收，通过后得到 dist/opencode

@@ -21,7 +21,7 @@ index af7c221..3a857dd 100644
          outro("Done")
          return
 diff --git a/packages/cli/src/services/updater.ts b/packages/cli/src/services/updater.ts
-index f74b4a6..b071e56 100644
+index 736e8f8..8481cfc 100644
 --- a/packages/cli/src/services/updater.ts
 +++ b/packages/cli/src/services/updater.ts
 @@ -10,6 +10,7 @@ import { stripVTControlCharacters } from "node:util"
@@ -30,17 +30,17 @@ index f74b4a6..b071e56 100644
  import { errorMessage } from "../util/error"
 +import { TermuxBuild } from "../termux"
  
- export const methods = ["curl", "npm", "pnpm", "bun", "yarn", "vp", "brew"] as const
+ export const methods = ["curl", "npm", "pnpm", "bun", "yarn", "vp", "brew", "winget"] as const
  
-@@ -197,6 +198,7 @@ const make = Effect.gen(function* () {
+@@ -212,6 +213,7 @@ const make = Effect.gen(function* () {
    })
  
    const method = Effect.fnUntraced(function* () {
 +    if (TermuxBuild.installedByInstaller(executable)) return "curl"
-     if (path.resolve(process.execPath) === curlBinary) return "curl"
+     if (executable === curlBinary) return "curl"
      if (installedFormula) return "brew"
-     if (!installedPackage) return
-@@ -249,6 +251,20 @@ const make = Effect.gen(function* () {
+     if (installedWinget) return "winget"
+@@ -273,6 +275,20 @@ const make = Effect.gen(function* () {
    }
  
    const release = Effect.fnUntraced(function* (method?: Method) {
@@ -61,7 +61,7 @@ index f74b4a6..b071e56 100644
      const distribution = method === "brew" ? "homebrew" : "npm"
      // Homebrew Core builds its formula on its own schedule, so the tap release does not describe it.
      const core = method === "brew" && installedFormula === "opencode"
-@@ -417,8 +433,8 @@ const make = Effect.gen(function* () {
+@@ -479,8 +495,8 @@ const make = Effect.gen(function* () {
            const installer = path.join(directory, "install")
            yield* runUpgrade({
              method,
