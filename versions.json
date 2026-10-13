@@ -38,9 +38,9 @@
   },
   "rust_pty": {
     "package": "bun-pty",
-    "version": "0.4.9",
-    "source_url": "https://codeload.github.com/sursaone/bun-pty/tar.gz/refs/tags/v0.4.9",
-    "source_sha256": "8ee8e622a2bd9e41b966f3907294519300e483cdf3f5e14e4de2170cfb28b807",
+    "version": "0.4.11",
+    "source_url": "https://codeload.github.com/sursaone/bun-pty/tar.gz/refs/tags/v0.4.11",
+    "source_sha256": "07ff88c9ee96019dd1691e9ede485e35221c036e599545075587cb85537157b2",
     "portable_pty_version": "0.9.0"
   },
   "zig": {

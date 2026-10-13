@@ -7,7 +7,11 @@
 | `@opentui/core-linux-arm64/libopentui.so` | OpenTUI 0.4.5 | `libm.so`, `libc.so`, `libdl.so` |
 | `@ff-labs/fff-bin-linux-arm64-gnu/libfff_c.so` | FFF 0.9.4 | `libz.so`, `libdl.so`, `libm.so`, `libc.so` |
 | `@parcel/watcher-linux-arm64-glibc/watcher.node` | `@parcel/watcher` 2.5.1 | `liblog.so`, `libdl.so`, `libm.so`, `libc.so` |
-| `bun-pty/rust-pty/target/release/librust_pty_arm64.so` | `bun-pty` 0.4.8 | `libdl.so`, `libc.so` |
+| `bun-pty/rust-pty/target/release/librust_pty_arm64.so` | `bun-pty` 0.4.11 | `libdl.so`, `libc.so` |
+| `bun-pty/rust-pty/target/release/librust_pty_arm64_musl.so` | 同上，同一个文件 | `libdl.so`, `libc.so` |
+
+bun-pty 0.4.10 起在 Linux 上同时内嵌 musl 版，只在 ld-musl 下加载。它只依赖 `libc.so`，
+与 Android 的同名，`--require-bionic` 审计分不出来，所以同样换成 Bionic 库。
 
 npm 包的版本必须与表中一致（即 `versions.json`），否则构建失败。产物里的模块名带
 Bun 生成的哈希后缀，如 `libopentui-x8k2b6xk.so`。

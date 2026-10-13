@@ -71,7 +71,8 @@ class SwapTests(unittest.TestCase):
             os.link(self.fff_bun / "src" / "ffi.ts", self.cache / "ffi.ts")
         # A workspace's own node_modules.
         self.pty = package(self.src / "packages" / "core" / "node_modules" / "bun-pty", "bun-pty", "0.4.8",
-                           {"rust-pty/target/release/librust_pty_arm64.so": "glibc pty"})
+                           {"rust-pty/target/release/librust_pty_arm64.so": "glibc pty",
+                            "rust-pty/target/release/librust_pty_arm64_musl.so": "musl pty"})
         self.opencode_pty = package(modules / "@opencode-ai" / "pty-linux-arm64-gnu",
                                     "@opencode-ai/pty-linux-arm64-gnu", "0.2.0",
                                     {"bin/opencode-pty": "glibc opencode-pty"})
@@ -103,11 +104,13 @@ class SwapTests(unittest.TestCase):
             "bionic fff")
         self.assertEqual((self.pty / "rust-pty/target/release/librust_pty_arm64.so").read_text(),
                          "bionic rust_pty")
+        self.assertEqual((self.pty / "rust-pty/target/release/librust_pty_arm64_musl.so").read_text(),
+                         "bionic rust_pty")
         self.assertEqual((self.fff_bun / "src" / "ffi.ts").read_text(), FFI_AFTER)
         opencode_pty = self.opencode_pty / "bin" / "opencode-pty"
         self.assertEqual(opencode_pty.read_text(), "bionic opencode_pty")
         self.assertTrue(os.access(opencode_pty, os.X_OK), "the replaced executable must stay executable")
-        self.assertEqual(len(report["assets"]), 5)
+        self.assertEqual(len(report["assets"]), 6)
         self.assertEqual(report["patches"][0]["package"], "@ff-labs/fff-bun@0.9.4")
 
     def test_symlinked_and_stored_copies_count_once(self):

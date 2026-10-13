@@ -44,7 +44,7 @@ OpenCode 的补丁按 fuzz 0 应用；上游改了相关代码时构建直接失
 ## 原生组件
 
 `bun install` 在 glibc 主机上装的是 linux-arm64 的平台包。`swap_native_assets.py` 在编译前
-把这五个文件换成从源码编译的版本：前四个是 Termux 里编译的 Bionic 库，opencode-pty 是
+把这些文件换成从源码编译的版本：前五个是 Termux 里编译的 Bionic 库，opencode-pty 是
 OpenCode 启动的独立程序，按上游 musl 版的方式编成静态可执行文件，不经过任何动态链接器：
 
 | npm 包 | 文件 |
@@ -53,6 +53,7 @@ OpenCode 启动的独立程序，按上游 musl 版的方式编成静态可执�
 | `@parcel/watcher-linux-arm64-glibc` | `watcher.node` |
 | `@ff-labs/fff-bin-linux-arm64-gnu` | `libfff_c.so` |
 | `bun-pty` | `rust-pty/target/release/librust_pty_arm64.so` |
+| `bun-pty` | `rust-pty/target/release/librust_pty_arm64_musl.so`（同一个 Bionic 库） |
 | `@opencode-ai/pty-linux-arm64-gnu` | `bin/opencode-pty` |
 
 装上的版本必须等于 `versions.json` 锁定、原生组件实际编译的版本，否则失败：上游升级依赖时

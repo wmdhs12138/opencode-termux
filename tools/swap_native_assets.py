@@ -29,6 +29,9 @@ ASSETS = [
     ("watcher", "@parcel/watcher-linux-arm64-glibc", "watcher.node"),
     ("fff", "@ff-labs/fff-bin-linux-arm64-gnu", "libfff_c.so"),
     ("rust_pty", "bun-pty", "rust-pty/target/release/librust_pty_arm64.so"),
+    # bun-pty also embeds its musl build on Linux, loaded only under ld-musl. It
+    # needs `libc.so` like Bionic does, so the audit cannot tell it apart.
+    ("rust_pty", "bun-pty", "rust-pty/target/release/librust_pty_arm64_musl.so"),
     # A static executable OpenCode starts, see scripts/build-opencode-pty.sh.
     ("opencode_pty", "@opencode-ai/pty-linux-arm64-gnu", "bin/opencode-pty"),
 ]
@@ -170,14 +173,15 @@ def main() -> int:
     parser.add_argument("source", type=Path, help="installed OpenCode source tree")
     parser.add_argument("--versions", type=Path, default=tools.parent / "versions.json")
     parser.add_argument("--patches", type=Path, default=tools.parent / "patches")
-    for key, _, _ in ASSETS:
+    keys = list(dict.fromkeys(key for key, _, _ in ASSETS))
+    for key in keys:
         parser.add_argument(f"--{key.replace('_', '-')}", type=Path, required=True,
                             help=f"Bionic replacement for the {key} asset")
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
 
     versions = json.loads(args.versions.read_text())
-    replacements = {key: getattr(args, key) for key, _, _ in ASSETS}
+    replacements = {key: getattr(args, key) for key in keys}
     try:
         report = swap(args.source.resolve(), versions, replacements, args.patches)
     except SwapError as error:
