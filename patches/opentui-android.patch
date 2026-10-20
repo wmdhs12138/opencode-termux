@@ -1,5 +1,5 @@
 diff --git a/packages/native/build.zig b/packages/native/build.zig
-index b226da7..21aa1ad 100644
+index 84cafc7..503cc29 100644
 --- a/packages/native/build.zig
 +++ b/packages/native/build.zig
 @@ -367,7 +367,8 @@ fn addNativeAudioDependencies(
@@ -12,7 +12,7 @@ index b226da7..21aa1ad 100644
              module.linkSystemLibrary("m", .{});
          },
          else => {},
-@@ -421,6 +422,11 @@ fn addTranslatedCImports(
+@@ -426,6 +427,11 @@ fn addTranslatedCImports(
      });
      yoga_translate.addIncludePath(yoga_dep.path(""));
      module.addImport("yoga", yoga_translate.createModule());
@@ -21,10 +21,18 @@ index b226da7..21aa1ad 100644
 +        addAndroidIncludes(b, miniaudio_translate, target);
 +        addAndroidIncludes(b, yoga_translate, target);
 +    }
+     addContextABIHeader(b, module, optimize, target);
  }
  
- /// Apply dependencies to a module
-@@ -711,6 +717,44 @@ fn buildSingleTarget(
+@@ -440,6 +446,7 @@ fn addContextABIHeader(
+         .target = target,
+         .optimize = optimize,
+     });
++    if (target.result.abi == .android) addAndroidIncludes(b, header, target);
+     module.addImport("context_abi_c", header.createModule());
+ }
+ 
+@@ -807,6 +814,44 @@ fn buildSingleTarget(
      try buildTarget(b, target_str, target_str, description, optimize, build_options, macos_sdk_path);
  }
  
@@ -47,7 +55,7 @@ index b226da7..21aa1ad 100644
 +
 +// opencode-termux: link against the NDK sysroot and raise PT_TLS alignment to
 +// what Android's linker requires.
-+fn addAndroidSysroot(b: *std.Build, lib: *std.Build.Step.Compile, module: *std.Build.Module) !void {
++fn addAndroidSysroot(b: *std.Build, lib: *std.Build.Step.Compile, module: *std.Build.Module) void {
 +    const sysroot = androidSysroot(b);
 +    const include = b.pathJoin(&.{ sysroot, "include" });
 +    const library = b.pathJoin(&.{ sysroot, "lib", "aarch64-linux-android" });
@@ -62,26 +70,35 @@ index b226da7..21aa1ad 100644
 +    , .{ include, include, library })));
 +    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ include, "c++", "v1" }) });
 +    module.addLibraryPath(.{ .cwd_relative = library });
-+    const tls_align = b.graph.environ_map.get("OPENCODE_TERMUX_TLS_ALIGN") orelse return error.MissingTLSAlignmentAnchor;
++    const tls_align = b.graph.environ_map.get("OPENCODE_TERMUX_TLS_ALIGN") orelse std.debug.panic("OPENCODE_TERMUX_TLS_ALIGN is not set", .{});
 +    module.addAssemblyFile(.{ .cwd_relative = tls_align });
 +}
 +
  fn buildTarget(
      b: *std.Build,
      zig_target: []const u8,
-@@ -746,6 +790,7 @@ fn buildTarget(
+@@ -828,6 +873,8 @@ fn buildTarget(
+     const build_step_name = try std.fmt.allocPrint(b.allocator, "build-{s}", .{output_name});
+     const build_step = b.step(build_step_name, try std.fmt.allocPrint(b.allocator, "Build for {s}", .{description}));
+     for (createLibraries(b, target, optimize, build_options, macos_sdk_path)) |lib| {
++        // opencode-termux: Bun loads the shared library; skip the archive.
++        if (target.result.abi == .android and lib.linkage.? == .static) continue;
+         const install_dir = b.addInstallArtifact(lib, .{
+             .dest_dir = .{ .override = .{ .custom = install_path } },
+             .h_dir = .{ .override = .{ .custom = install_path } },
+@@ -870,6 +917,7 @@ fn createLibraries(
+         .linkage = .dynamic,
      });
- 
-     if (target.result.os.tag == .linux and optimize != .Debug) lib.build_id = .sha1;
-+    if (target.result.abi == .android) try addAndroidSysroot(b, lib, module);
- 
-     addNativeAudioDependencies(b, module, target, macos_sdk_path);
-     addYogaDependencies(b, module);
+     if (target.result.os.tag == .linux and optimize != .Debug) shared.build_id = .sha1;
++    if (target.result.abi == .android) addAndroidSysroot(b, shared, module);
+     const static = b.addLibrary(.{
+         // COFF uses .lib for both archives and DLL import libraries.
+         .name = if (target.result.os.tag == .windows) "opentui-static" else LIB_NAME,
 diff --git a/packages/native/src/clipboard/host.zig b/packages/native/src/clipboard/host.zig
-index 6305136..68e7c2f 100644
+index 1edeab4..6835c76 100644
 --- a/packages/native/src/clipboard/host.zig
 +++ b/packages/native/src/clipboard/host.zig
-@@ -104,7 +104,14 @@ extern "c" fn pthread_peekjoin_np(thread: std.Thread.Handle, result: ?*?*anyopaq
+@@ -105,7 +105,14 @@ extern "c" fn pthread_peekjoin_np(thread: std.Thread.Handle, result: ?*?*anyopaq
  
  fn tryJoinThread(thread: std.Thread) bool {
      return switch (builtin.os.tag) {
