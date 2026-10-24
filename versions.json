@@ -27,9 +27,9 @@
     "node_addon_api_sha256": "b10455d15a977c0cd17a1cb0eb679e03d939f8ef8d4302eb33e1f78dacc71f82"
   },
   "opentui": {
-    "version": "0.6.6",
-    "source_url": "https://codeload.github.com/anomalyco/opentui/tar.gz/refs/tags/v0.6.6",
-    "source_sha256": "9c7539a47c73f11022fcb81840fb7856342804a3d133a8e2a0a8cbe0c66a4fed"
+    "version": "0.6.8",
+    "source_url": "https://codeload.github.com/anomalyco/opentui/tar.gz/refs/tags/v0.6.8",
+    "source_sha256": "e9997a181827ed59a6123acb61024122f286a57cb41e0678233a8741d9d26ebe"
   },
   "fff": {
     "version": "0.10.5",

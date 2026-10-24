@@ -4,7 +4,7 @@
 
 | npm 包里的文件 | 上游 | `DT_NEEDED` |
 |---|---:|---|
-| `@opentui/core-linux-arm64/libopentui.so` | OpenTUI 0.6.6 | `libm.so`, `libc.so`, `libdl.so` |
+| `@opentui/core-linux-arm64/libopentui.so` | OpenTUI 0.6.8 | `libm.so`, `libc.so`, `libdl.so` |
 | `@ff-labs/fff-bin-linux-arm64-gnu/libfff_c.so` | FFF 0.10.5 | `libz.so`, `libdl.so`, `libm.so`, `libc.so` |
 | `@parcel/watcher-linux-arm64-glibc/watcher.node` | `@parcel/watcher` 2.5.1 | `liblog.so`, `libdl.so`, `libm.so`, `libc.so` |
 | `bun-pty/rust-pty/target/release/librust_pty_arm64.so` | `bun-pty` 0.4.11 | `libdl.so`, `libc.so` |
