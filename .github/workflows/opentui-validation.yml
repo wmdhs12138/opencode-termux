@@ -1,0 +1,23 @@
+name: validate OpenTUI update
+on:
+  push:
+    branches: [fix/ci-opentui-070]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: make test
+      - name: Inspect OpenTUI 0.7.0 source and Android patch
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-all-errors -o /tmp/opentui-0.7.0.tar.gz https://codeload.github.com/anomalyco/opentui/tar.gz/refs/tags/v0.7.0
+          sha256sum /tmp/opentui-0.7.0.tar.gz
+          mkdir /tmp/opentui-0.7.0
+          tar -xzf /tmp/opentui-0.7.0.tar.gz -C /tmp/opentui-0.7.0 --strip-components=1
+          patch -d /tmp/opentui-0.7.0 -p1 --fuzz=0 --batch --dry-run < patches/opentui-android.patch
