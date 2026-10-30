@@ -54,7 +54,7 @@ OpenCode 启动的独立程序，按上游 musl 版的方式编成静态可执�
 | `@ff-labs/fff-bin-linux-arm64-gnu` | `libfff_c.so` |
 | `bun-pty` | `rust-pty/target/release/librust_pty_arm64.so` |
 | `bun-pty` | `rust-pty/target/release/librust_pty_arm64_musl.so`（同一个 Bionic 库） |
-| `@opencode-ai/pty-linux-arm64-gnu` | `bin/opencode-pty` |
+| `@opencode/pty-linux-arm64-gnu` | `bin/opencode-pty` |
 
 装上的版本必须等于 `versions.json` 锁定、原生组件实际编译的版本，否则失败：上游升级依赖时
 要先更新组件。替换是删掉再写新文件，因为 Bun 把 `node_modules` 硬链接到全局缓存。

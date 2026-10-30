@@ -33,7 +33,7 @@ ASSETS = [
     # needs `libc.so` like Bionic does, so the audit cannot tell it apart.
     ("rust_pty", "bun-pty", "rust-pty/target/release/librust_pty_arm64_musl.so"),
     # A static executable OpenCode starts, see scripts/build-opencode-pty.sh.
-    ("opencode_pty", "@opencode-ai/pty-linux-arm64-gnu", "bin/opencode-pty"),
+    ("opencode_pty", "@opencode/pty-linux-arm64-gnu", "bin/opencode-pty"),
 ]
 # (versions.json key, npm package, patch file under patches/)
 PATCHES = [

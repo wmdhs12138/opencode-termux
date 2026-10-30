@@ -1,26 +1,18 @@
 diff --git a/src/daemon/unix.rs b/src/daemon/unix.rs
-index 30e2a0c..f30ea44 100644
+index 8867ea7..d0a45a4 100644
 --- a/src/daemon/unix.rs
 +++ b/src/daemon/unix.rs
-@@ -152,11 +152,17 @@ fn socket_path(directory: &Path) -> Result<PathBuf> {
- }
+@@ -173,7 +173,12 @@ fn socket_root() -> Result<PathBuf> {
  
- // Sockets stay in /tmp so their paths fit sun_path; temp cleaners skip sockets.
-+// opencode-termux: Android has no /tmp; Termux's is $PREFIX/tmp, whose
-+// socket paths (about 92 bytes) still fit.
- fn socket_root() -> PathBuf {
--    PathBuf::from("/tmp").join(format!(
--        "opencode-pty-{}",
--        nix::unistd::Uid::effective().as_raw()
--    ))
-+    std::env::var_os("PREFIX")
-+        .map(|prefix| PathBuf::from(prefix).join("tmp"))
-+        .filter(|tmp| tmp.is_dir())
-+        .unwrap_or_else(|| PathBuf::from("/tmp"))
-+        .join(format!(
-+            "opencode-pty-{}",
-+            nix::unistd::Uid::effective().as_raw()
-+        ))
- }
- 
- fn socket_file(root: &Path, canonical_directory: &Path) -> PathBuf {
+ fn resolve_socket_root(directory: Option<PathBuf>, uid: u32) -> Result<PathBuf> {
+     let base = match directory {
+-        None => PathBuf::from("/tmp"),
++        // opencode-termux: Android has no /tmp; Termux's is $PREFIX/tmp, whose
++        // socket paths (about 92 bytes) still fit.
++        None => std::env::var_os("PREFIX")
++            .map(|prefix| PathBuf::from(prefix).join("tmp"))
++            .filter(|tmp| tmp.is_dir())
++            .unwrap_or_else(|| PathBuf::from("/tmp")),
+         Some(directory) if !directory.is_absolute() => {
+             bail!("OPENCODE_PTY_SOCKET_DIR must be an absolute path")
+         }

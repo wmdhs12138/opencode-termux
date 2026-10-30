@@ -73,8 +73,8 @@ class SwapTests(unittest.TestCase):
         self.pty = package(self.src / "packages" / "core" / "node_modules" / "bun-pty", "bun-pty", "0.4.8",
                            {"rust-pty/target/release/librust_pty_arm64.so": "glibc pty",
                             "rust-pty/target/release/librust_pty_arm64_musl.so": "musl pty"})
-        self.opencode_pty = package(modules / "@opencode-ai" / "pty-linux-arm64-gnu",
-                                    "@opencode-ai/pty-linux-arm64-gnu", "0.2.0",
+        self.opencode_pty = package(modules / "@opencode" / "pty-linux-arm64-gnu",
+                                    "@opencode/pty-linux-arm64-gnu", "0.2.0",
                                     {"bin/opencode-pty": "glibc opencode-pty"})
         (self.opencode_pty / "bin" / "opencode-pty").chmod(0o755)
 

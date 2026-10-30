@@ -27,9 +27,9 @@
     "node_addon_api_sha256": "b10455d15a977c0cd17a1cb0eb679e03d939f8ef8d4302eb33e1f78dacc71f82"
   },
   "opentui": {
-    "version": "0.7.0",
-    "source_url": "https://codeload.github.com/anomalyco/opentui/tar.gz/refs/tags/v0.7.0",
-    "source_sha256": "346cfe6e5e5b2624ba38b0afff2461ddd062a68790e4437c203a2c805dc236b6"
+    "version": "0.8.0",
+    "source_url": "https://codeload.github.com/anomalyco/opentui/tar.gz/refs/tags/v0.8.0",
+    "source_sha256": "20f55c5dea47b6db8d88166a767c9f3a588511662d909b567576b6d45aa37ef2"
   },
   "fff": {
     "version": "0.10.5",
@@ -51,9 +51,10 @@
     "x86_64_linux_sha256": "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
   },
   "opencode_pty": {
-    "version": "0.3.1",
-    "source_url": "https://codeload.github.com/anomalyco/opencode-pty/tar.gz/refs/tags/v0.3.1",
-    "source_sha256": "101efcfde719cd9ead649d1fc1e1c31a31e89c854bf63b9cd2e977a7661f18a0",
+    "version": "0.4.0",
+    "source_url": "https://codeload.github.com/anomalyco/opencode/tar.gz/refs/tags/process-daemon-v0.4.0",
+    "source_sha256": "e052c76f871414923ecddb8845af9bd57e4271cc73f4d350bbb8ec5a33e6d360",
+    "source_dir": "packages/process-daemon",
     "target": "aarch64-unknown-linux-musl"
   }
 }

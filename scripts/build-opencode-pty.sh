@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build opencode-pty, the persistent PTY helper OpenCode 2 embeds, from source
 # as a static musl executable: upstream's own aarch64-unknown-linux-musl release
-# build (anomalyco/opencode-pty, .github/workflows/publish.yml).
+# build (anomalyco/opencode, packages/process-daemon,
+# .github/workflows/release-process-daemon.yml).
 #
 # It is a separate program OpenCode starts, not a library it loads. A static
 # executable needs neither glibc nor the Bionic linker, so the upstream target
@@ -24,12 +25,12 @@ for command_name in curl git cargo rustup musl-gcc; do
   command -v "$command_name" >/dev/null || { echo "build-opencode-pty: $command_name is required" >&2; exit 1; }
 done
 
-read -r VERSION SOURCE_URL SOURCE_SHA TARGET ZIG_VERSION ZIG_URL ZIG_SHA < <(
+read -r VERSION SOURCE_URL SOURCE_SHA SOURCE_DIR TARGET ZIG_VERSION ZIG_URL ZIG_SHA < <(
   python3 - "$ROOT/versions.json" <<'PY'
 import json, sys
 x = json.load(open(sys.argv[1]))
 p, z = x["opencode_pty"], x["zig"]
-print(p["version"], p["source_url"], p["source_sha256"], p["target"],
+print(p["version"], p["source_url"], p["source_sha256"], p["source_dir"], p["target"],
       z["version"], z["aarch64_linux_url"], z["aarch64_linux_sha256"])
 PY
 )
@@ -57,7 +58,10 @@ fetch "$ZIG_URL" "$ZIG_SHA" "$ZIG_ARCHIVE"
 STAGE="$(mktemp -d "$OUT_DIR/.build.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/source" "$STAGE/zig"
-tar -xzf "$SOURCE_ARCHIVE" -C "$STAGE/source" --strip-components=1
+# The archive is OpenCode's whole monorepo: extract only the package, without
+# the archive's top directory and $SOURCE_DIR's own components.
+STRIP=$(( $(tr -cd / <<<"$SOURCE_DIR" | wc -c) + 2 ))
+tar -xzf "$SOURCE_ARCHIVE" -C "$STAGE/source" --strip-components="$STRIP" --wildcards "*/$SOURCE_DIR"
 tar -xJf "$ZIG_ARCHIVE" -C "$STAGE/zig" --strip-components=1
 patch -d "$STAGE/source" -p1 --fuzz=0 --batch < "$ROOT/patches/opencode-pty-termux.patch"
 
