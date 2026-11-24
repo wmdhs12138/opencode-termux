@@ -150,6 +150,23 @@ class ResolveTests(unittest.TestCase):
         with self.assertRaisesRegex(resolver.ResolveError, "integrity"):
             self.resolve(net=tampered)
 
+    def test_iroh_uses_the_matching_android_package_from_the_lock(self):
+        host = "@number0/iroh-linux-arm64-gnu"
+        android = "@number0/iroh-android-arm64"
+        url = f"https://registry.npmjs.org/{android}/-/iroh-android-arm64-1.2.0.tgz"
+        data = b"Android Iroh tarball"
+        packages = {host: [f"{host}@1.2.0", "", {}, "sha512-x"],
+                    android: [f"{android}@1.2.0", "", {}, sha512(data)]}
+        net = FakeNetwork({url: data})
+        iroh = self.resolve(lock_text(**packages), net=net)["iroh"]
+        self.assertEqual(iroh, {"version": "1.2.0", "packages": [host], "npm": android,
+                                "source_url": url, "source_sha256": hashlib.sha256(data).hexdigest()})
+        with self.assertRaisesRegex(resolver.ResolveError, "integrity"):
+            self.resolve(lock_text(**packages), net=FakeNetwork({url: b"tampered"}))
+        packages[android][0] = f"{android}@1.2.1"
+        with self.assertRaisesRegex(resolver.ResolveError, "expected one version"):
+            self.resolve(lock_text(**packages), net=net)
+
     def test_watcher_gets_its_nested_node_addon_api(self):
         nested = ["node-addon-api@8.0.0", "", {}, sha512(b"eight")]
         net = FakeNetwork({"https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.0.0.tgz": b"eight"})

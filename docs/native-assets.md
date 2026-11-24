@@ -9,6 +9,7 @@
 | `@parcel/watcher-linux-arm64-glibc/watcher.node` | `@parcel/watcher` | `liblog.so`, `libdl.so`, `libm.so`, `libc.so` |
 | `bun-pty/rust-pty/target/release/librust_pty_arm64.so` | `bun-pty` | `libdl.so`, `libc.so` |
 | `bun-pty/rust-pty/target/release/librust_pty_arm64_musl.so` | 同上，同一个文件 | `libdl.so`, `libc.so` |
+| `@number0/iroh-linux-arm64-gnu/iroh.linux-arm64-gnu.node`（OpenCode 2.4 起） | 同版本的 `@number0/iroh-android-arm64` | `libdl.so`, `libm.so`, `libc.so` |
 
 bun-pty 0.4.10 起在 Linux 上同时内嵌 musl 版，只在 ld-musl 下加载。它只依赖 `libc.so`，
 与 Android 的同名，`--require-bionic` 审计分不出来，所以同样换成 Bionic 库。
@@ -23,7 +24,8 @@ bun-pty 0.4.10 起在 Linux 上同时内嵌 musl 版，只在 ld-musl 下加载�
   `process-daemon-v{version}`）用 `git ls-remote` 解析出 commit，按 commit 下载归档，记下
   commit 和 SHA-256。
 - npm 源码（`@parcel/watcher` 和它装上的 `node-addon-api`）：registry 的 tarball，对照
-  `bun.lock` 里的 sha512 integrity。
+  `bun.lock` 里的 sha512 integrity。Iroh 的 Android 预编译包也按该校验值验证，
+  打包后在 Termux 中用绑定启动本地 QUIC 端点进行冒烟测试。
 - Bun 底座和编译用的 Bun：版本取 OpenCode `package.json` 的 `packageManager`，归档对照该
   Release 的 `SHASUMS256.txt`。
 - `versions.json` 的 `zig` 按版本登记归档地址和 SHA-256。OpenTUI 使用 `build.zig.zon`

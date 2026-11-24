@@ -37,7 +37,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from swap_native_assets import ASSETS, PATCHES  # noqa: E402
+from swap_native_assets import ASSETS, IROH_ASSET, PATCHES  # noqa: E402
 
 BUN_RELEASES = "https://github.com/oven-sh/bun/releases/download"
 
@@ -279,6 +279,15 @@ def resolve(source: Path, versions: dict, net: Network) -> dict:
                               "node_addon_api_url": found["source_url"],
                               "node_addon_api_sha256": found["source_sha256"]})
         doc[key] = entry
+
+    # Bun compiles for the host's Linux package. Iroh also publishes an Android
+    # binding at the same lockfile version, so use its contents in that slot.
+    key, host_package, _ = IROH_ASSET
+    if lock_entries(lock, host_package):
+        android_package = "@number0/iroh-android-arm64"
+        version = single_version(lock, [host_package, android_package])
+        doc[key] = {"version": version, "packages": [host_package], "npm": android_package,
+                    **resolve_npm(net, lock, android_package, version)}
     return doc
 
 
